@@ -1,0 +1,41 @@
+{
+  "name": "@livei18n/react",
+  "version": "0.1.0",
+  "description": "React SDK for LiveI18n real-time translation platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rollup -c && tsc --emitDeclarationOnly",
+    "dev": "rollup -c --watch",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "react",
+    "i18n",
+    "translation",
+    "internationalization",
+    "livei18n"
+  ],
+  "author": "LiveI18n",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.1",
+    "@types/react": "^18.0.0",
+    "typescript": "^5.0.0",
+    "rollup": "^4.0.0",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "tslib": "^2.6.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/livei18n/sdk"
+  }
+}
