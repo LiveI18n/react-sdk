@@ -1,11 +1,11 @@
-# @livei18n/react
+# @livei18n/react-sdk
 
 React SDK for LiveI18n real-time translation platform.
 
 ## Installation
 
 ```bash
-npm install @livei18n/react
+npm install @livei18n/react-sdk
 ```
 
 ## Quick Start
@@ -13,7 +13,7 @@ npm install @livei18n/react
 ### 1. Initialize the SDK
 
 ```typescript
-import { initializeLiveI18n } from '@livei18n/react';
+import { initializeLiveI18n } from '@livei18n/react-sdk';
 
 // Initialize once in your app root
 initializeLiveI18n({
@@ -26,7 +26,7 @@ initializeLiveI18n({
 ### 2. Use the LiveText Component
 
 ```jsx
-import { LiveText } from '@livei18n/react';
+import { LiveText } from '@livei18n/react-sdk';
 
 function App() {
   return (
@@ -51,7 +51,7 @@ function App() {
 ### 3. Programmatic Translation
 
 ```typescript
-import { useLiveI18n } from '@livei18n/react';
+import { useLiveI18n } from '@livei18n/react-sdk';
 
 function MyComponent() {
   const { translate } = useLiveI18n();

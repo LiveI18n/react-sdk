@@ -1,5 +1,5 @@
 {
-  "name": "@livei18n/react",
+  "name": "@livei18n/react-sdk",
   "version": "0.1.0",
   "description": "React SDK for LiveI18n real-time translation platform",
   "main": "dist/index.js",
