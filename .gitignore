@@ -1,5 +1,4 @@
-# Compiled output
-/dist
+# Compiled output (keep dist for npm/GitHub installs)
 /build
 /lib
 /es
