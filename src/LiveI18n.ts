@@ -18,8 +18,49 @@ export class LiveI18n {
   }
 
   /**
-   * Translate text using the LiveI18n API
+   * Sleep for a given number of milliseconds
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Make a single translation request attempt
+   */
+  private async makeTranslationRequest(
+    text: string,
+    locale: string,
+    tone: string,
+    context: string,
+    cacheKey: string
+  ): Promise<TranslationResponse> {
+    const response = await fetch(`${this.endpoint}/api/v1/translate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': this.apiKey,
+        'X-Customer-ID': this.customerId,
+      },
+      body: JSON.stringify({
+        text: text.substring(0, 5000),
+        locale,
+        tone,
+        context,
+        cache_key: cacheKey,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Translate text using the LiveI18n API with retry logic
    * Generates cache key and sends it to backend to eliminate drift
+   * Retries up to 5 times with exponential backoff, max 5 seconds total
    */
   async translate(text: string, options?: LiveTextOptions): Promise<string> {
     // Input validation
@@ -46,46 +87,64 @@ export class LiveI18n {
     const cached = this.cache.get(cacheKey);
     if (cached) return cached;
 
-    try {
-      const response = await fetch(`${this.endpoint}/api/v1/translate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': this.apiKey,
-          'X-Customer-ID': this.customerId,
-        },
-        body: JSON.stringify({
-          text: text.substring(0, 5000),
-          locale,
-          tone,
-          context,
-          cache_key: cacheKey, // Send cache key to backend
-        }),
-      });
+    const maxRetries = 5;
+    const baseDelay = 100; // Start with 100ms
+    const maxTotalTime = 5000; // 5 seconds total limit
+    const startTime = Date.now();
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Check if we've exceeded the total time limit
+      if (Date.now() - startTime >= maxTotalTime) {
+        console.warn(`LiveI18n: Translation timeout after ${maxTotalTime}ms`);
+        break;
       }
 
-      const result: TranslationResponse = await response.json();
-      
-      // Cache the result locally
-      this.cache.set(cacheKey, result.translated);
+      try {
+        const result = await this.makeTranslationRequest(text, locale, tone, context, cacheKey);
+        
+        // Cache the result locally
+        this.cache.set(cacheKey, result.translated);
 
-      // Log warnings for low confidence translations
-      if (result.confidence < 0.7) {
-        console.warn(`LiveI18n: Low confidence translation (${result.confidence}):`, {
-          original: text,
-          translated: result.translated,
-          locale
-        });
+        // Log warnings for low confidence translations
+        if (result.confidence < 0.4) {
+          console.warn(`LiveI18n: Low confidence translation (${result.confidence}):`, {
+            original: text,
+            translated: result.translated,
+            locale
+          });
+        }
+
+        // Log successful retry if not first attempt
+        if (attempt > 0) {
+          console.log(`LiveI18n: Translation succeeded on attempt ${attempt + 1}`);
+        }
+
+        return result.translated;
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries - 1;
+        const timeElapsed = Date.now() - startTime;
+        
+        if (isLastAttempt || timeElapsed >= maxTotalTime) {
+          console.error(`LiveI18n: Translation failed after ${attempt + 1} attempts:`, error);
+          return text; // Fallback to original text
+        }
+
+        // Calculate delay with exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
+        const delay = Math.min(baseDelay * Math.pow(2, attempt), 1600);
+        
+        // Ensure we don't exceed the total time limit with the delay
+        const remainingTime = maxTotalTime - timeElapsed;
+        const actualDelay = Math.min(delay, remainingTime - 100); // Leave 100ms for the request
+
+        if (actualDelay > 0) {
+          console.warn(`LiveI18n: Attempt ${attempt + 1} failed, retrying in ${actualDelay}ms:`, error);
+          await this.sleep(actualDelay);
+        }
       }
-
-      return result.translated;
-    } catch (error) {
-      console.error('LiveI18n: Translation failed:', error);
-      return text; // Fallback to original text
     }
+
+    // Should not reach here, but fallback just in case
+    return text;
   }
 
   /**
