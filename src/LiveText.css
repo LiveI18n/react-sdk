@@ -8,16 +8,18 @@
 .livei18n-loading {
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    transparent 40%,
-    rgba(255, 255, 255, 0.6) 50%,
-    transparent 60%,
-    transparent 100%
+    rgba(59, 130, 246, 0.1) 0%,
+    rgba(59, 130, 246, 0.3) 30%,
+    rgba(59, 130, 246, 0.8) 50%,
+    rgba(59, 130, 246, 0.3) 70%,
+    rgba(59, 130, 246, 0.1) 100%
   );
   background-size: 200% 100%;
-  animation: livei18n-shimmer 1.5s ease-in-out infinite;
+  animation: livei18n-shimmer 1.2s ease-in-out infinite;
   position: relative;
   overflow: hidden;
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
 }
 
 /* Alternative shimmer for dark themes */
@@ -25,24 +27,34 @@
   .livei18n-loading {
     background: linear-gradient(
       90deg,
-      transparent 0%,
-      transparent 40%,
-      rgba(255, 255, 255, 0.3) 50%,
-      transparent 60%,
-      transparent 100%
+      rgba(96, 165, 250, 0.15) 0%,
+      rgba(96, 165, 250, 0.4) 30%,
+      rgba(96, 165, 250, 0.9) 50%,
+      rgba(96, 165, 250, 0.4) 70%,
+      rgba(96, 165, 250, 0.15) 100%
     );
+    box-shadow: 0 0 8px rgba(96, 165, 250, 0.3);
   }
 }
 
 @keyframes livei18n-shimmer {
   0% {
     background-position: 200% 0;
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.02);
   }
   50% {
     background-position: -200% 0;
+    transform: scale(1);
+  }
+  75% {
+    transform: scale(1.02);
   }
   100% {
     background-position: 200% 0;
+    transform: scale(1);
   }
 }
 
@@ -50,12 +62,14 @@
 @media (prefers-reduced-motion: reduce) {
   .livei18n-loading {
     animation: none;
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(59, 130, 246, 0.2);
+    box-shadow: none;
+    transform: none;
   }
   
   @media (prefers-color-scheme: dark) {
     .livei18n-loading {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(96, 165, 250, 0.25);
     }
   }
 }
