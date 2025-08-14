@@ -9,7 +9,6 @@ export interface LiveI18nConfig {
   customerId: string;
   endpoint?: string;
   defaultLanguage?: string; // Global default language
-  showLoadingAnimation?: boolean; // Enable/disable loading animation (default: true)
 }
 
 export interface TranslationResponse {
