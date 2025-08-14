@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { LiveI18n } from './LiveI18n';
 import type { LiveTextOptions, LiveI18nConfig } from './types';
+import './LiveText.css';
 
 // Global instance
 let globalInstance: LiveI18n | null = null;
@@ -115,6 +116,30 @@ export const LiveText: React.FC<LiveTextProps> = ({
   }, [textContent, tone, context, language, fallback, onTranslationComplete, onError]);
 
   // Show loading state or translated text
+  // Check if loading animation is enabled
+  const showAnimation = globalInstance?.getShowLoadingAnimation() ?? true;
+  
+  if (showAnimation && isLoading) {
+    return (
+      <span 
+        className="livei18n-text livei18n-loading"
+        aria-label="Translating text..."
+        role="status"
+      >
+        {translated}
+      </span>
+    );
+  }
+  
+  if (showAnimation) {
+    return (
+      <span className="livei18n-text">
+        {translated}
+      </span>
+    );
+  }
+  
+  // No animation enabled - return text directly
   return <>{translated}</>;
 };
 

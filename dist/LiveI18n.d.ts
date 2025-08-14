@@ -5,6 +5,7 @@ export declare class LiveI18n {
     private cache;
     private endpoint;
     private defaultLanguage?;
+    private showLoadingAnimation;
     constructor(config: LiveI18nConfig);
     /**
      * Translate text using the LiveI18n API
@@ -34,6 +35,10 @@ export declare class LiveI18n {
      * Get the current default language
      */
     getDefaultLanguage(): string | undefined;
+    /**
+     * Check if loading animation is enabled
+     */
+    getShowLoadingAnimation(): boolean;
     /**
      * Detect browser locale
      */

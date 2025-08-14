@@ -1,0 +1,61 @@
+/* LiveI18n Text Component Styles */
+
+.livei18n-text {
+  display: inline;
+  position: relative;
+}
+
+.livei18n-loading {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: livei18n-shimmer 1.5s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Alternative shimmer for dark themes */
+@media (prefers-color-scheme: dark) {
+  .livei18n-loading {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(255, 255, 255, 0.3) 50%,
+      transparent 60%,
+      transparent 100%
+    );
+  }
+}
+
+@keyframes livei18n-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  50% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Accessibility: Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .livei18n-loading {
+    animation: none;
+    background: rgba(0, 0, 0, 0.1);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .livei18n-loading {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  }
+}

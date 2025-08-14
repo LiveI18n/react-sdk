@@ -8,12 +8,14 @@ export class LiveI18n {
   private cache: LRUCache<string, string>;
   private endpoint: string;
   private defaultLanguage?: string;
+  private showLoadingAnimation: boolean;
 
   constructor(config: LiveI18nConfig) {
     this.apiKey = config.apiKey;
     this.customerId = config.customerId;
     this.endpoint = config.endpoint || 'https://api.livei18n.com';
     this.defaultLanguage = config.defaultLanguage;
+    this.showLoadingAnimation = config.showLoadingAnimation ?? true; // Default to true
     this.cache = new LRUCache(500, 1); // 500 entries, 1 hour TTL
   }
 
@@ -151,6 +153,13 @@ export class LiveI18n {
    */
   getDefaultLanguage(): string | undefined {
     return this.defaultLanguage;
+  }
+
+  /**
+   * Check if loading animation is enabled
+   */
+  getShowLoadingAnimation(): boolean {
+    return this.showLoadingAnimation;
   }
 
   /**

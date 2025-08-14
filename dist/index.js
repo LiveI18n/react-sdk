@@ -94,10 +94,12 @@ function simpleHash(str) {
 
 class LiveI18n {
     constructor(config) {
+        var _a;
         this.apiKey = config.apiKey;
         this.customerId = config.customerId;
         this.endpoint = config.endpoint || 'https://api.livei18n.com';
         this.defaultLanguage = config.defaultLanguage;
+        this.showLoadingAnimation = (_a = config.showLoadingAnimation) !== null && _a !== void 0 ? _a : true; // Default to true
         this.cache = new LRUCache(500, 1); // 500 entries, 1 hour TTL
     }
     /**
@@ -213,6 +215,12 @@ class LiveI18n {
         return this.defaultLanguage;
     }
     /**
+     * Check if loading animation is enabled
+     */
+    getShowLoadingAnimation() {
+        return this.showLoadingAnimation;
+    }
+    /**
      * Detect browser locale
      */
     detectLocale() {
@@ -269,6 +277,7 @@ function extractStringContent(children) {
     return String(children || '');
 }
 const LiveText = ({ children, tone, context, language, fallback, onTranslationComplete, onError }) => {
+    var _a;
     // Extract string content from children
     const textContent = extractStringContent(children);
     const [translated, setTranslated] = useState(textContent);
@@ -299,6 +308,15 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
         });
     }, [textContent, tone, context, language, fallback, onTranslationComplete, onError]);
     // Show loading state or translated text
+    // Check if loading animation is enabled
+    const showAnimation = (_a = globalInstance === null || globalInstance === void 0 ? void 0 : globalInstance.getShowLoadingAnimation()) !== null && _a !== void 0 ? _a : true;
+    if (showAnimation && isLoading) {
+        return (jsx("span", { className: "livei18n-text livei18n-loading", "aria-label": "Translating text...", role: "status", children: translated }));
+    }
+    if (showAnimation) {
+        return (jsx("span", { className: "livei18n-text", children: translated }));
+    }
+    // No animation enabled - return text directly
     return jsx(Fragment, { children: translated });
 };
 /**

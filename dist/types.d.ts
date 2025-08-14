@@ -8,6 +8,7 @@ export interface LiveI18nConfig {
     customerId: string;
     endpoint?: string;
     defaultLanguage?: string;
+    showLoadingAnimation?: boolean;
 }
 export interface TranslationResponse {
     translated: string;
