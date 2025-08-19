@@ -1,7 +1,6 @@
 import React from 'react';
 import { LiveI18n } from './LiveI18n';
 import type { LiveTextOptions, LiveI18nConfig } from './types';
-import './LiveText.css';
 /**
  * Initialize the global LiveI18n instance
  * Must be called before using LiveText components

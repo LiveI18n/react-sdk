@@ -62,7 +62,7 @@ export class LiveI18n {
    * Generates cache key and sends it to backend to eliminate drift
    * Retries up to 5 times with exponential backoff, max 5 seconds total
    */
-  async translate(text: string, options?: LiveTextOptions): Promise<string> {
+  async translate(text: string, options?: LiveTextOptions, onRetry?: (attempt: number) => void): Promise<string> {
     // Input validation
     if (!text || text.length === 0) return text;
     if (text.length > 5000) {
@@ -100,6 +100,10 @@ export class LiveI18n {
       }
 
       try {
+        if (attempt > 0 && onRetry) {
+          onRetry(attempt);
+        }
+
         const result = await this.makeTranslationRequest(text, locale, tone, context, cacheKey);
         
         // Cache the result locally

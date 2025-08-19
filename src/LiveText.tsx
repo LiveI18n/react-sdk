@@ -83,23 +83,40 @@ export const LiveText: React.FC<LiveTextProps> = ({
   const textContent = extractStringContent(children);
   
   const [translated, setTranslated] = useState(textContent);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [attempts, setAttempts] = useState(0);
+
+
+  useEffect(() => {
+    // if we are on a second attempt set loading to false
+    // thhis way we can show the original text and exit the loading animation early
+    // while we keep attempting translation ini the background
+    if (attempts > 0) {
+      setIsLoading(false);
+    }
+  }, [attempts]);
 
   useEffect(() => {
     if (!globalInstance) {
+      setIsLoading(false);
       console.error('LiveI18n not initialized. Call initializeLiveI18n() first.');
       return;
     }
 
     // Don't translate empty strings
     if (!textContent.trim()) {
+      setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
 
+    const onRetry: (attempts: number) => void = (attempts: number) => {
+      setAttempts(attempts)
+    }
+
     globalInstance
-      .translate(textContent, { tone, context, language })
+      .translate(textContent, { tone, context, language }, )
       .then((result) => {
         setTranslated(result);
         onTranslationComplete?.(textContent, result);

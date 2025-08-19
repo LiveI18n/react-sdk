@@ -5,13 +5,21 @@ export declare class LiveI18n {
     private cache;
     private endpoint;
     private defaultLanguage?;
-    private showLoadingAnimation;
     constructor(config: LiveI18nConfig);
     /**
-     * Translate text using the LiveI18n API
-     * Generates cache key and sends it to backend to eliminate drift
+     * Sleep for a given number of milliseconds
      */
-    translate(text: string, options?: LiveTextOptions): Promise<string>;
+    private sleep;
+    /**
+     * Make a single translation request attempt
+     */
+    private makeTranslationRequest;
+    /**
+     * Translate text using the LiveI18n API with retry logic
+     * Generates cache key and sends it to backend to eliminate drift
+     * Retries up to 5 times with exponential backoff, max 5 seconds total
+     */
+    translate(text: string, options?: LiveTextOptions, onRetry?: (attempt: number) => void): Promise<string>;
     /**
      * Submit feedback for a translation
      */
@@ -35,10 +43,6 @@ export declare class LiveI18n {
      * Get the current default language
      */
     getDefaultLanguage(): string | undefined;
-    /**
-     * Check if loading animation is enabled
-     */
-    getShowLoadingAnimation(): boolean;
     /**
      * Detect browser locale
      */

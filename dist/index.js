@@ -94,19 +94,48 @@ function simpleHash(str) {
 
 class LiveI18n {
     constructor(config) {
-        var _a;
         this.apiKey = config.apiKey;
         this.customerId = config.customerId;
         this.endpoint = config.endpoint || 'https://api.livei18n.com';
         this.defaultLanguage = config.defaultLanguage;
-        this.showLoadingAnimation = (_a = config.showLoadingAnimation) !== null && _a !== void 0 ? _a : true; // Default to true
         this.cache = new LRUCache(500, 1); // 500 entries, 1 hour TTL
     }
     /**
-     * Translate text using the LiveI18n API
-     * Generates cache key and sends it to backend to eliminate drift
+     * Sleep for a given number of milliseconds
      */
-    async translate(text, options) {
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    /**
+     * Make a single translation request attempt
+     */
+    async makeTranslationRequest(text, locale, tone, context, cacheKey) {
+        const response = await fetch(`${this.endpoint}/api/v1/translate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': this.apiKey,
+                'X-Customer-ID': this.customerId,
+            },
+            body: JSON.stringify({
+                text: text.substring(0, 5000),
+                locale,
+                tone,
+                context,
+                cache_key: cacheKey,
+            }),
+        });
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+        return await response.json();
+    }
+    /**
+     * Translate text using the LiveI18n API with retry logic
+     * Generates cache key and sends it to backend to eliminate drift
+     * Retries up to 5 times with exponential backoff, max 5 seconds total
+     */
+    async translate(text, options, onRetry) {
         // Input validation
         if (!text || text.length === 0)
             return text;
@@ -123,42 +152,57 @@ class LiveI18n {
         const cached = this.cache.get(cacheKey);
         if (cached)
             return cached;
-        try {
-            const response = await fetch(`${this.endpoint}/api/v1/translate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': this.apiKey,
-                    'X-Customer-ID': this.customerId,
-                },
-                body: JSON.stringify({
-                    text: text.substring(0, 5000),
-                    locale,
-                    tone,
-                    context,
-                    cache_key: cacheKey, // Send cache key to backend
-                }),
-            });
-            if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
+        const maxRetries = 5;
+        const baseDelay = 100; // Start with 100ms
+        const maxTotalTime = 5000; // 5 seconds total limit
+        const startTime = Date.now();
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            // Check if we've exceeded the total time limit
+            if (Date.now() - startTime >= maxTotalTime) {
+                console.warn(`LiveI18n: Translation timeout after ${maxTotalTime}ms`);
+                break;
             }
-            const result = await response.json();
-            // Cache the result locally
-            this.cache.set(cacheKey, result.translated);
-            // Log warnings for low confidence translations
-            if (result.confidence < 0.7) {
-                console.warn(`LiveI18n: Low confidence translation (${result.confidence}):`, {
-                    original: text,
-                    translated: result.translated,
-                    locale
-                });
+            try {
+                if (attempt > 0 && onRetry) {
+                    onRetry(attempt);
+                }
+                const result = await this.makeTranslationRequest(text, locale, tone, context, cacheKey);
+                // Cache the result locally
+                this.cache.set(cacheKey, result.translated);
+                // Log warnings for low confidence translations
+                if (result.confidence < 0.4) {
+                    console.warn(`LiveI18n: Low confidence translation (${result.confidence}):`, {
+                        original: text,
+                        translated: result.translated,
+                        locale
+                    });
+                }
+                // Log successful retry if not first attempt
+                if (attempt > 0) {
+                    console.log(`LiveI18n: Translation succeeded on attempt ${attempt + 1}`);
+                }
+                return result.translated;
             }
-            return result.translated;
+            catch (error) {
+                const isLastAttempt = attempt === maxRetries - 1;
+                const timeElapsed = Date.now() - startTime;
+                if (isLastAttempt || timeElapsed >= maxTotalTime) {
+                    console.error(`LiveI18n: Translation failed after ${attempt + 1} attempts:`, error);
+                    return text; // Fallback to original text
+                }
+                // Calculate delay with exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
+                const delay = Math.min(baseDelay * Math.pow(2, attempt), 1600);
+                // Ensure we don't exceed the total time limit with the delay
+                const remainingTime = maxTotalTime - timeElapsed;
+                const actualDelay = Math.min(delay, remainingTime - 100); // Leave 100ms for the request
+                if (actualDelay > 0) {
+                    console.warn(`LiveI18n: Attempt ${attempt + 1} failed, retrying in ${actualDelay}ms:`, error);
+                    await this.sleep(actualDelay);
+                }
+            }
         }
-        catch (error) {
-            console.error('LiveI18n: Translation failed:', error);
-            return text; // Fallback to original text
-        }
+        // Should not reach here, but fallback just in case
+        return text;
     }
     /**
      * Submit feedback for a translation
@@ -213,12 +257,6 @@ class LiveI18n {
      */
     getDefaultLanguage() {
         return this.defaultLanguage;
-    }
-    /**
-     * Check if loading animation is enabled
-     */
-    getShowLoadingAnimation() {
-        return this.showLoadingAnimation;
     }
     /**
      * Detect browser locale
@@ -277,18 +315,28 @@ function extractStringContent(children) {
     return String(children || '');
 }
 const LiveText = ({ children, tone, context, language, fallback, onTranslationComplete, onError }) => {
-    var _a;
     // Extract string content from children
     const textContent = extractStringContent(children);
     const [translated, setTranslated] = useState(textContent);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [attempts, setAttempts] = useState(0);
+    useEffect(() => {
+        // if we are on a second attempt set loading to false
+        // thhis way we can show the original text and exit the loading animation early
+        // while we keep attempting translation ini the background
+        if (attempts > 0) {
+            setIsLoading(false);
+        }
+    }, [attempts]);
     useEffect(() => {
         if (!globalInstance) {
+            setIsLoading(false);
             console.error('LiveI18n not initialized. Call initializeLiveI18n() first.');
             return;
         }
         // Don't translate empty strings
         if (!textContent.trim()) {
+            setIsLoading(false);
             return;
         }
         setIsLoading(true);
@@ -307,16 +355,6 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
             setIsLoading(false);
         });
     }, [textContent, tone, context, language, fallback, onTranslationComplete, onError]);
-    // Show loading state or translated text
-    // Check if loading animation is enabled
-    const showAnimation = (_a = globalInstance === null || globalInstance === void 0 ? void 0 : globalInstance.getShowLoadingAnimation()) !== null && _a !== void 0 ? _a : true;
-    if (showAnimation && isLoading) {
-        return (jsx("span", { className: "livei18n-text livei18n-loading", "aria-label": "Translating text...", role: "status", children: translated }));
-    }
-    if (showAnimation) {
-        return (jsx("span", { className: "livei18n-text", children: translated }));
-    }
-    // No animation enabled - return text directly
     return jsx(Fragment, { children: translated });
 };
 /**
