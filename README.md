@@ -19,7 +19,7 @@ import { initializeLiveI18n } from '@livei18n/react-sdk';
 initializeLiveI18n({
   apiKey: 'your-api-key',
   customerId: 'your-customer-id',
-  endpoint: 'https://api.livei18n.com' // optional
+  defaultLanguage: 'es-ES' // optional - target language for translations
 });
 ```
 
@@ -87,9 +87,45 @@ function MyComponent() {
 Returns an object with:
 
 - `translate(text, options)` - Translate text programmatically
-- `submitFeedback(original, translated, locale, rating, correction?)` - Submit translation feedback
 - `clearCache()` - Clear local translation cache
 - `getCacheStats()` - Get cache statistics
+- `updateDefaultLanguage(language?)` - Update the default language
+- `getDefaultLanguage()` - Get the current default language
+
+## Configuration
+
+### Default Language
+
+The `defaultLanguage` option controls the target language for all translations when no `language` prop is specified on individual `LiveText` components.
+
+**Auto-detection (recommended for global apps):**
+```typescript
+initializeLiveI18n({
+  apiKey: 'your-api-key',
+  customerId: 'your-customer-id'
+  // No defaultLanguage - uses browser language
+});
+```
+
+**Fixed language (recommended for region-specific apps):**
+```typescript
+initializeLiveI18n({
+  apiKey: 'your-api-key',
+  customerId: 'your-customer-id',
+  defaultLanguage: 'es-ES' // Always translate to Spanish
+});
+```
+
+**Dynamic language switching:**
+```typescript
+import { updateDefaultLanguage } from '@livei18n/react-sdk';
+
+// Switch to French
+updateDefaultLanguage('fr-FR');
+
+// Enable auto-detection
+updateDefaultLanguage(undefined);
+```
 
 ## Features
 
@@ -99,7 +135,7 @@ Returns an object with:
 - ✅ Real-time translation
 - ✅ Context-aware translations
 - ✅ Tone control
-- ✅ Feedback system
+- ✅ Default language configuration
 
 ## Cache Key Algorithm
 

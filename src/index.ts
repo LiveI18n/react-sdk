@@ -14,20 +14,3 @@ export async function translate(text: string, options?: LiveTextOptions): Promis
   }
   return instance.translate(text, options);
 }
-
-// Direct feedback function for convenience  
-export async function submitFeedback(
-  originalText: string,
-  translatedText: string,
-  locale: string,
-  rating: number,
-  correction?: string
-): Promise<boolean> {
-  const { getLiveI18nInstance } = await import('./LiveText');
-  const instance = getLiveI18nInstance();
-  if (!instance) {
-    console.warn('LiveI18n not initialized, feedback not submitted');
-    return false;
-  }
-  return instance.submitFeedback(originalText, translatedText, locale, rating, correction);
-}

@@ -205,33 +205,6 @@ class LiveI18n {
         return text;
     }
     /**
-     * Submit feedback for a translation
-     */
-    async submitFeedback(originalText, translatedText, locale, rating, correction) {
-        try {
-            const response = await fetch(`${this.endpoint}/api/v1/feedback`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': this.apiKey,
-                    'X-Customer-ID': this.customerId,
-                },
-                body: JSON.stringify({
-                    original_text: originalText,
-                    translated_text: translatedText,
-                    locale,
-                    rating,
-                    correction,
-                }),
-            });
-            return response.ok;
-        }
-        catch (error) {
-            console.error('LiveI18n: Failed to submit feedback:', error);
-            return false;
-        }
-    }
-    /**
      * Clear local cache
      */
     clearCache() {
@@ -324,7 +297,7 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
         // if we are on a second attempt set loading to false
         // thhis way we can show the original text and exit the loading animation early
         // while we keep attempting translation ini the background
-        if (attempts > 0) {
+        if (attempts > 0 && isLoading) {
             setIsLoading(false);
         }
     }, [attempts]);
@@ -369,16 +342,8 @@ function useLiveI18n() {
         }
         return instance.translate(text, options);
     };
-    const submitFeedback = async (originalText, translatedText, locale, rating, correction) => {
-        if (!instance) {
-            console.warn('LiveI18n not initialized, feedback not submitted');
-            return false;
-        }
-        return instance.submitFeedback(originalText, translatedText, locale, rating, correction);
-    };
     return {
         translate,
-        submitFeedback,
         defaultLanguage: instance === null || instance === void 0 ? void 0 : instance.getDefaultLanguage(),
         clearCache: () => instance === null || instance === void 0 ? void 0 : instance.clearCache(),
         getCacheStats: () => (instance === null || instance === void 0 ? void 0 : instance.getCacheStats()) || { size: 0, maxSize: 0 },
@@ -429,16 +394,6 @@ async function translate(text, options) {
     }
     return instance.translate(text, options);
 }
-// Direct feedback function for convenience  
-async function submitFeedback(originalText, translatedText, locale, rating, correction) {
-    const { getLiveI18nInstance } = await Promise.resolve().then(function () { return LiveText$1; });
-    const instance = getLiveI18nInstance();
-    if (!instance) {
-        console.warn('LiveI18n not initialized, feedback not submitted');
-        return false;
-    }
-    return instance.submitFeedback(originalText, translatedText, locale, rating, correction);
-}
 
-export { LiveI18n, LiveText, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, submitFeedback, translate, updateDefaultLanguage, useLiveI18n };
+export { LiveI18n, LiveText, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n };
 //# sourceMappingURL=index.js.map

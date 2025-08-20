@@ -151,39 +151,6 @@ export class LiveI18n {
     return text;
   }
 
-  /**
-   * Submit feedback for a translation
-   */
-  async submitFeedback(
-    originalText: string,
-    translatedText: string,
-    locale: string,
-    rating: number,
-    correction?: string
-  ): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.endpoint}/api/v1/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': this.apiKey,
-          'X-Customer-ID': this.customerId,
-        },
-        body: JSON.stringify({
-          original_text: originalText,
-          translated_text: translatedText,
-          locale,
-          rating,
-          correction,
-        }),
-      });
-
-      return response.ok;
-    } catch (error) {
-      console.error('LiveI18n: Failed to submit feedback:', error);
-      return false;
-    }
-  }
 
   /**
    * Clear local cache

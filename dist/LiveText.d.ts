@@ -31,7 +31,6 @@ export declare const LiveText: React.FC<LiveTextProps>;
  */
 export declare function useLiveI18n(): {
     translate: (text: string, options?: LiveTextOptions) => Promise<string>;
-    submitFeedback: (originalText: string, translatedText: string, locale: string, rating: number, correction?: string) => Promise<boolean>;
     defaultLanguage: string | undefined;
     clearCache: () => void | undefined;
     getCacheStats: () => {

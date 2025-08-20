@@ -91,7 +91,7 @@ export const LiveText: React.FC<LiveTextProps> = ({
     // if we are on a second attempt set loading to false
     // thhis way we can show the original text and exit the loading animation early
     // while we keep attempting translation ini the background
-    if (attempts > 0) {
+    if (attempts > 0 && isLoading) {
       setIsLoading(false);
     }
   }, [attempts]);
@@ -148,23 +148,8 @@ export function useLiveI18n() {
     return instance.translate(text, options);
   };
 
-  const submitFeedback = async (
-    originalText: string,
-    translatedText: string,
-    locale: string,
-    rating: number,
-    correction?: string
-  ): Promise<boolean> => {
-    if (!instance) {
-      console.warn('LiveI18n not initialized, feedback not submitted');
-      return false;
-    }
-    return instance.submitFeedback(originalText, translatedText, locale, rating, correction);
-  };
-
   return {
     translate,
-    submitFeedback,
     defaultLanguage: instance?.getDefaultLanguage(),
     clearCache: () => instance?.clearCache(),
     getCacheStats: () => instance?.getCacheStats() || { size: 0, maxSize: 0 },

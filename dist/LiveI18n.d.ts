@@ -21,10 +21,6 @@ export declare class LiveI18n {
      */
     translate(text: string, options?: LiveTextOptions, onRetry?: (attempt: number) => void): Promise<string>;
     /**
-     * Submit feedback for a translation
-     */
-    submitFeedback(originalText: string, translatedText: string, locale: string, rating: number, correction?: string): Promise<boolean>;
-    /**
      * Clear local cache
      */
     clearCache(): void;
