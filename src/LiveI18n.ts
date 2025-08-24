@@ -1,11 +1,12 @@
-import { LRUCache } from './LRUCache';
+import { LRUCache, DEFAULT_CACHE_SIZE } from './LRUCache';
+import { LocalStorageCache } from './LocalStorageCache';
 import { generateCacheKey } from './cacheKey';
 import type { LiveI18nConfig, LiveTextOptions, TranslationResponse } from './types';
 
 export class LiveI18n {
   private apiKey: string;
   private customerId: string;
-  private cache: LRUCache<string, string>;
+  private cache: LRUCache<string, string> | LocalStorageCache;
   private endpoint: string;
   private defaultLanguage?: string;
 
@@ -14,7 +15,40 @@ export class LiveI18n {
     this.customerId = config.customerId;
     this.endpoint = config.endpoint || 'https://api.livei18n.com';
     this.defaultLanguage = config.defaultLanguage;
-    this.cache = new LRUCache(500, 1); // 500 entries, 1 hour TTL
+    
+    // Create appropriate cache based on configuration
+    this.cache = this.createCache(config);
+  }
+
+  private createCache(config: LiveI18nConfig): LRUCache<string, string> | LocalStorageCache {
+    // Create cache based on configuration
+    if (config.cache) {
+      if (config.cache.persistent !== false) {
+        // Use localStorage + memory cache by default
+        const localStorageCache = new LocalStorageCache(
+          config.cache.entrySize || DEFAULT_CACHE_SIZE,
+          config.cache.ttlHours || 1
+        );
+        
+        // Preload cache if requested (default: true)
+        if (config.cache.preload !== false) {
+          localStorageCache.preloadCache().catch(error => {
+            console.warn('LiveI18n: Failed to preload cache:', error);
+          });
+        }
+        
+        return localStorageCache;
+      }
+      
+      // Use memory-only cache with custom settings
+      return new LRUCache(
+        config.cache.entrySize || DEFAULT_CACHE_SIZE, 
+        config.cache.ttlHours || 1
+      );
+    }
+
+    // Default to persistent cache (no preload unless explicitly configured)
+    return new LocalStorageCache(DEFAULT_CACHE_SIZE, 1);
   }
 
   /**

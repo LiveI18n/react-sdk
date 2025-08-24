@@ -1,6 +1,9 @@
 export { LiveText, initializeLiveI18n, useLiveI18n, getLiveI18nInstance, updateDefaultLanguage, getDefaultLanguage } from './LiveText';
 export { LiveI18n } from './LiveI18n';
-export type { LiveTextOptions, LiveI18nConfig } from './types';
+export { LRUCache } from './LRUCache';
+export { LocalStorageCache } from './LocalStorageCache';
+export { generateCacheKey } from './cacheKey';
+export type { LiveTextOptions, LiveI18nConfig, TranslationResponse } from './types';
 
 import type { LiveTextOptions } from './types';
 
