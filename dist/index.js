@@ -1,8 +1,9 @@
 import { jsx, Fragment } from 'react/jsx-runtime';
 import { useState, useEffect } from 'react';
 
+const DEFAULT_CACHE_SIZE = 500;
 class LRUCache {
-    constructor(maxSize = 500, ttlHours = 1) {
+    constructor(maxSize = DEFAULT_CACHE_SIZE, ttlHours = 1) {
         this.cache = new Map();
         this.maxSize = maxSize;
         this.ttl = ttlHours * 60 * 60 * 1000; // Convert to milliseconds
@@ -21,12 +22,16 @@ class LRUCache {
         this.cache.set(key, item);
         return item.value;
     }
-    set(key, value) {
+    set(key, value, onEvict) {
         // Remove oldest item if cache is full
         if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
             const firstKey = this.cache.keys().next().value;
             if (firstKey !== undefined) {
                 this.cache.delete(firstKey);
+                // Notify about eviction
+                if (onEvict) {
+                    onEvict(firstKey);
+                }
             }
         }
         this.cache.set(key, {
@@ -39,6 +44,206 @@ class LRUCache {
     }
     size() {
         return this.cache.size;
+    }
+}
+
+/**
+ * Hybrid cache that combines fast in-memory LRU cache with localStorage persistence
+ * Optimized for React web applications that support localStorage
+ */
+class LocalStorageCache {
+    constructor(maxMemorySize = DEFAULT_CACHE_SIZE, ttlHours = 1) {
+        this.storagePrefix = 'livei18n_cache_';
+        /**
+         * Reusable eviction handler to keep localStorage in sync with memory cache
+         */
+        this.onEvict = (evictedKey) => {
+            if (this.localStorage) {
+                try {
+                    this.localStorage.removeItem(this.storagePrefix + evictedKey);
+                }
+                catch (error) {
+                    console.warn('LiveI18n: Error removing evicted key from localStorage:', error);
+                }
+            }
+        };
+        this.ttl = ttlHours * 60 * 60 * 1000; // Convert to milliseconds
+        this.memoryCache = new LRUCache(maxMemorySize, ttlHours);
+        try {
+            // Check if localStorage is available
+            if (typeof window !== 'undefined' && window.localStorage) {
+                this.localStorage = window.localStorage;
+                console.log('LiveI18n: localStorage persistent cache initialized');
+            }
+            else {
+                this.localStorage = null;
+                console.warn('LiveI18n: localStorage not available, falling back to memory-only cache');
+            }
+        }
+        catch (error) {
+            console.warn('LiveI18n: localStorage access failed, falling back to memory-only cache');
+            this.localStorage = null;
+        }
+    }
+    get(key) {
+        // First, try memory cache (fastest) - LRUCache handles TTL internally
+        const memoryResult = this.memoryCache.get(key);
+        if (memoryResult) {
+            return memoryResult;
+        }
+        // Try localStorage (synchronous in browsers)
+        if (this.localStorage) {
+            try {
+                const persistentData = this.localStorage.getItem(this.storagePrefix + key);
+                if (persistentData) {
+                    const item = JSON.parse(persistentData);
+                    // Check if item has expired
+                    if (Date.now() - item.timestamp > this.ttl) {
+                        this.localStorage.removeItem(this.storagePrefix + key);
+                        return undefined;
+                    }
+                    // Put in memory cache for faster future access - LRUCache handles its own TTL
+                    this.memoryCache.set(key, item.value, this.onEvict);
+                    return item.value;
+                }
+            }
+            catch (error) {
+                console.warn('LiveI18n: Error reading from localStorage cache:', error);
+            }
+        }
+        return undefined;
+    }
+    set(key, value) {
+        // Store in memory cache with eviction callback to keep localStorage in sync
+        this.memoryCache.set(key, value, this.onEvict);
+        // Also store in localStorage for persistence with our own TTL management
+        if (this.localStorage) {
+            try {
+                const item = {
+                    value,
+                    timestamp: Date.now()
+                };
+                this.localStorage.setItem(this.storagePrefix + key, JSON.stringify(item));
+            }
+            catch (error) {
+                console.warn('LiveI18n: Error writing to localStorage cache:', error);
+                // If quota exceeded, try to clear some old items
+                if (error instanceof DOMException && error.code === DOMException.QUOTA_EXCEEDED_ERR) {
+                    this.clearExpiredItems();
+                }
+            }
+        }
+    }
+    clear() {
+        // Clear memory cache
+        this.memoryCache.clear();
+        // Clear localStorage
+        if (this.localStorage) {
+            try {
+                const keys = Object.keys(this.localStorage);
+                const cacheKeys = keys.filter(key => key.startsWith(this.storagePrefix));
+                cacheKeys.forEach(key => this.localStorage.removeItem(key));
+            }
+            catch (error) {
+                console.warn('LiveI18n: Error clearing localStorage cache:', error);
+            }
+        }
+    }
+    size() {
+        // Return memory cache size (localStorage doesn't provide easy size calculation)
+        return this.memoryCache.size();
+    }
+    /**
+     * Get statistics about both cache layers
+     */
+    getCacheStats() {
+        return {
+            memory: this.memoryCache.size(),
+            persistent: this.localStorage !== null,
+            localStorageAvailable: this.localStorage !== null
+        };
+    }
+    /**
+     * Preload cache from localStorage
+     * Call this during app initialization for better performance
+     */
+    async preloadCache(maxItems = 50) {
+        if (!this.localStorage)
+            return;
+        try {
+            const keys = Object.keys(this.localStorage);
+            const cacheKeys = keys
+                .filter(key => key.startsWith(this.storagePrefix))
+                .slice(0, maxItems); // Limit to prevent memory issues
+            if (cacheKeys.length > 0) {
+                const now = Date.now();
+                let loaded = 0;
+                for (const fullKey of cacheKeys) {
+                    try {
+                        const data = this.localStorage.getItem(fullKey);
+                        if (data) {
+                            const item = JSON.parse(data);
+                            const key = fullKey.replace(this.storagePrefix, '');
+                            // Check if item has expired
+                            if (now - item.timestamp <= this.ttl) {
+                                this.memoryCache.set(key, item.value, this.onEvict);
+                                loaded++;
+                            }
+                            else {
+                                // Remove expired item
+                                this.localStorage.removeItem(fullKey);
+                            }
+                        }
+                    }
+                    catch (error) {
+                        // Invalid data, remove it
+                        this.localStorage.removeItem(fullKey);
+                    }
+                }
+                if (loaded > 0) {
+                    console.log(`LiveI18n: Preloaded ${loaded} cache entries from localStorage`);
+                }
+            }
+        }
+        catch (error) {
+            console.warn('LiveI18n: Error preloading cache from localStorage:', error);
+        }
+    }
+    /**
+     * Clear expired items from localStorage to free up space
+     */
+    clearExpiredItems() {
+        if (!this.localStorage)
+            return;
+        try {
+            const keys = Object.keys(this.localStorage);
+            const cacheKeys = keys.filter(key => key.startsWith(this.storagePrefix));
+            const now = Date.now();
+            let cleared = 0;
+            for (const fullKey of cacheKeys) {
+                try {
+                    const data = this.localStorage.getItem(fullKey);
+                    if (data) {
+                        const item = JSON.parse(data);
+                        if (now - item.timestamp > this.ttl) {
+                            this.localStorage.removeItem(fullKey);
+                            cleared++;
+                        }
+                    }
+                }
+                catch (error) {
+                    // Invalid data, remove it
+                    this.localStorage.removeItem(fullKey);
+                    cleared++;
+                }
+            }
+            if (cleared > 0) {
+                console.log(`LiveI18n: Cleared ${cleared} expired cache entries from localStorage`);
+            }
+        }
+        catch (error) {
+            console.warn('LiveI18n: Error clearing expired cache items:', error);
+        }
     }
 }
 
@@ -98,7 +303,28 @@ class LiveI18n {
         this.customerId = config.customerId;
         this.endpoint = config.endpoint || 'https://api.livei18n.com';
         this.defaultLanguage = config.defaultLanguage;
-        this.cache = new LRUCache(500, 1); // 500 entries, 1 hour TTL
+        // Create appropriate cache based on configuration
+        this.cache = this.createCache(config);
+    }
+    createCache(config) {
+        // Create cache based on configuration
+        if (config.cache) {
+            if (config.cache.persistent !== false) {
+                // Use localStorage + memory cache by default
+                const localStorageCache = new LocalStorageCache(config.cache.entrySize || DEFAULT_CACHE_SIZE, config.cache.ttlHours || 1);
+                // Preload cache if requested (default: true)
+                if (config.cache.preload !== false) {
+                    localStorageCache.preloadCache().catch(error => {
+                        console.warn('LiveI18n: Failed to preload cache:', error);
+                    });
+                }
+                return localStorageCache;
+            }
+            // Use memory-only cache with custom settings
+            return new LRUCache(config.cache.entrySize || DEFAULT_CACHE_SIZE, config.cache.ttlHours || 1);
+        }
+        // Default to persistent cache (no preload unless explicitly configured)
+        return new LocalStorageCache(DEFAULT_CACHE_SIZE, 1);
     }
     /**
      * Sleep for a given number of milliseconds
@@ -395,5 +621,5 @@ async function translate(text, options) {
     return instance.translate(text, options);
 }
 
-export { LiveI18n, LiveText, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n };
+export { LRUCache, LiveI18n, LiveText, LocalStorageCache, generateCacheKey, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n };
 //# sourceMappingURL=index.js.map

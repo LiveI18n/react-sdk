@@ -6,6 +6,7 @@ export declare class LiveI18n {
     private endpoint;
     private defaultLanguage?;
     constructor(config: LiveI18nConfig);
+    private createCache;
     /**
      * Sleep for a given number of milliseconds
      */
