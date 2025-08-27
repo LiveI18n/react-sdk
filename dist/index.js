@@ -360,7 +360,7 @@ class LiveI18n {
             }),
         });
         if (!response.ok) {
-            throw new TranslationError(`API error: ${response.status} ${response.statusText}. ${JSON.stringify(response.json())}`, response.status);
+            throw new TranslationError(`API error: ${response.status} ${response.statusText}. ${response.json()}`, response.status);
         }
         return await response.json();
     }
