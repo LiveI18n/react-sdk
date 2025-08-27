@@ -1,4 +1,5 @@
-export { LiveText, initializeLiveI18n, useLiveI18n, getLiveI18nInstance, updateDefaultLanguage, getDefaultLanguage } from './LiveText';
+export { LiveText, initializeLiveI18n, useLiveI18n, getLiveI18nInstance, updateDefaultLanguage, getDefaultLanguage, LiveI18nProvider } from './LiveText';
+export type { LiveI18nProviderProps } from './LiveText';
 export { LiveI18n } from './LiveI18n';
 export { LRUCache } from './LRUCache';
 export { LocalStorageCache } from './LocalStorageCache';

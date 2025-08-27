@@ -2,15 +2,24 @@ import React from 'react';
 import { LiveI18n } from './LiveI18n';
 import type { LiveTextOptions, LiveI18nConfig } from './types';
 /**
- * Initialize the global LiveI18n instance
- * Must be called before using LiveText components
+ * Legacy function - use LiveI18nProvider instead
+ * @deprecated Use LiveI18nProvider component instead
  */
 export declare function initializeLiveI18n(config: LiveI18nConfig): void;
 /**
- * Get the global LiveI18n instance
- * Logs error if not initialized instead of throwing
+ * Legacy function - use useLiveI18n hook instead
+ * @deprecated Use useLiveI18n hook within LiveI18nProvider instead
  */
 export declare function getLiveI18nInstance(): LiveI18n | null;
+/**
+ * React Context Provider for LiveI18n
+ * Provides a cleaner alternative to the global instance pattern
+ */
+export interface LiveI18nProviderProps {
+    config: LiveI18nConfig;
+    children: React.ReactNode;
+}
+export declare const LiveI18nProvider: React.FC<LiveI18nProviderProps>;
 /**
  * React component for automatic text translation
  *
@@ -28,11 +37,12 @@ export interface LiveTextProps extends LiveTextOptions {
 export declare const LiveText: React.FC<LiveTextProps>;
 /**
  * Hook for programmatic translation access
+ * Must be used within LiveI18nProvider
  */
 export declare function useLiveI18n(): {
     translate: (text: string, options?: LiveTextOptions) => Promise<string>;
     defaultLanguage: string | undefined;
-    clearCache: () => void | undefined;
+    clearCache: () => void;
     getCacheStats: () => {
         size: number;
         maxSize: number;
@@ -41,12 +51,12 @@ export declare function useLiveI18n(): {
     getDefaultLanguage: () => string | undefined;
 };
 /**
- * Update the default language of the global instance
- * Note: This standalone function won't trigger React re-renders
- * Use the updateDefaultLanguage from useLiveI18n() hook for reactive updates
+ * Legacy function - use useLiveI18n hook instead
+ * @deprecated Use updateDefaultLanguage from useLiveI18n hook within LiveI18nProvider instead
  */
 export declare function updateDefaultLanguage(language?: string): void;
 /**
- * Get the current default language of the global instance
+ * Legacy function - use useLiveI18n hook instead
+ * @deprecated Use defaultLanguage from useLiveI18n hook within LiveI18nProvider instead
  */
 export declare function getDefaultLanguage(): string | undefined;

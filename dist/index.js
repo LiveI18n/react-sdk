@@ -1,5 +1,5 @@
 import { jsx, Fragment } from 'react/jsx-runtime';
-import { useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
 const DEFAULT_CACHE_SIZE = 500;
 class LRUCache {
@@ -506,26 +506,40 @@ class LiveI18n {
     }
 }
 
-// Global instance
-let globalInstance = null;
+const LiveI18nContext = createContext({
+    instance: null,
+    defaultLanguage: undefined,
+    updateDefaultLanguage: () => { }
+});
 /**
- * Initialize the global LiveI18n instance
- * Must be called before using LiveText components
+ * Legacy function - use LiveI18nProvider instead
+ * @deprecated Use LiveI18nProvider component instead
  */
 function initializeLiveI18n(config) {
-    globalInstance = new LiveI18n(config);
+    console.warn('initializeLiveI18n is deprecated. Use LiveI18nProvider component instead.');
 }
 /**
- * Get the global LiveI18n instance
- * Logs error if not initialized instead of throwing
+ * Legacy function - use useLiveI18n hook instead
+ * @deprecated Use useLiveI18n hook within LiveI18nProvider instead
  */
 function getLiveI18nInstance() {
-    if (!globalInstance) {
-        console.error('LiveI18n not initialized. Call initializeLiveI18n() first.');
-        return null;
-    }
-    return globalInstance;
+    console.warn('getLiveI18nInstance is deprecated. Use useLiveI18n hook within LiveI18nProvider instead.');
+    return null;
 }
+const LiveI18nProvider = ({ config, children }) => {
+    const [instance] = useState(() => new LiveI18n(config));
+    const [defaultLanguage, setDefaultLanguage] = useState(instance.getDefaultLanguage());
+    const updateDefaultLanguage = useCallback((language) => {
+        instance.updateDefaultLanguage(language);
+        setDefaultLanguage(language);
+    }, [instance]);
+    const contextValue = useCallback(() => ({
+        instance,
+        defaultLanguage,
+        updateDefaultLanguage
+    }), [instance, defaultLanguage, updateDefaultLanguage]);
+    return (jsx(LiveI18nContext.Provider, { value: contextValue(), children: children }));
+};
 /**
  * Extract string content from React.ReactNode
  * Handles strings, numbers, arrays of strings/numbers, and filters out non-text content
@@ -557,32 +571,21 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
     const [translated, setTranslated] = useState(textContent);
     const [isLoading, setIsLoading] = useState(true);
     const [attempts, setAttempts] = useState(0);
-    const [forceRender, setForceRender] = useState(0); // For triggering re-renders
-    const instance = getLiveI18nInstance();
-    // Subscribe to language changes to trigger re-translation
-    useEffect(() => {
-        if (!instance)
-            return;
-        const unsubscribe = instance.addLanguageChangeListener(() => {
-            // Force re-render when default language changes
-            setForceRender(prev => prev + 1);
-        });
-        return unsubscribe; // Cleanup on unmount
-    }, [instance]);
+    const contextValue = useContext(LiveI18nContext);
+    if (!contextValue.instance) {
+        throw new Error('LiveText must be used within LiveI18nProvider');
+    }
+    const instance = contextValue.instance;
+    const defaultLanguage = contextValue.defaultLanguage;
     useEffect(() => {
         // if we are on a second attempt set loading to false
-        // thhis way we can show the original text and exit the loading animation early
-        // while we keep attempting translation ini the background
+        // this way we can show the original text and exit the loading animation early
+        // while we keep attempting translation in the background
         if (attempts > 0 && isLoading) {
             setIsLoading(false);
         }
     }, [attempts]);
     useEffect(() => {
-        if (!instance) {
-            setIsLoading(false);
-            console.error('LiveI18n not initialized. Call initializeLiveI18n() first.');
-            return;
-        }
         // Don't translate empty strings
         if (!textContent.trim()) {
             setIsLoading(false);
@@ -606,66 +609,60 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
             .finally(() => {
             setIsLoading(false);
         });
-    }, [textContent, tone, context, language, forceRender, fallback, onTranslationComplete, onError]);
+    }, [
+        textContent,
+        tone,
+        context,
+        language,
+        defaultLanguage,
+        fallback,
+        onTranslationComplete,
+        onError,
+        instance
+    ]);
     return jsx(Fragment, { children: translated });
 };
 /**
  * Hook for programmatic translation access
+ * Must be used within LiveI18nProvider
  */
 function useLiveI18n() {
-    const instance = getLiveI18nInstance();
-    const [defaultLanguage, setDefaultLanguage] = useState(instance === null || instance === void 0 ? void 0 : instance.getDefaultLanguage());
+    const context = useContext(LiveI18nContext);
+    if (!context.instance) {
+        throw new Error('useLiveI18n must be used within LiveI18nProvider');
+    }
+    const instance = context.instance; // TypeScript now knows this is not null
     const translate = async (text, options) => {
-        if (!instance) {
-            console.warn('LiveI18n not initialized, returning original text');
-            return text;
-        }
         return instance.translate(text, options);
     };
-    const updateDefaultLanguage = useCallback((language) => {
-        if (!instance) {
-            console.warn('LiveI18n not initialized, cannot update default language');
-            return;
-        }
-        instance.updateDefaultLanguage(language);
-        setDefaultLanguage(language);
-    }, [instance]);
     return {
         translate,
-        defaultLanguage,
-        clearCache: () => instance === null || instance === void 0 ? void 0 : instance.clearCache(),
-        getCacheStats: () => (instance === null || instance === void 0 ? void 0 : instance.getCacheStats()) || { size: 0, maxSize: 0 },
-        updateDefaultLanguage,
-        getDefaultLanguage: () => instance === null || instance === void 0 ? void 0 : instance.getDefaultLanguage()
+        defaultLanguage: context.defaultLanguage,
+        clearCache: () => instance.clearCache(),
+        getCacheStats: () => instance.getCacheStats() || { size: 0, maxSize: 0 },
+        updateDefaultLanguage: context.updateDefaultLanguage,
+        getDefaultLanguage: () => instance.getDefaultLanguage()
     };
 }
 /**
- * Update the default language of the global instance
- * Note: This standalone function won't trigger React re-renders
- * Use the updateDefaultLanguage from useLiveI18n() hook for reactive updates
+ * Legacy function - use useLiveI18n hook instead
+ * @deprecated Use updateDefaultLanguage from useLiveI18n hook within LiveI18nProvider instead
  */
 function updateDefaultLanguage(language) {
-    const instance = getLiveI18nInstance();
-    if (!instance) {
-        console.warn('LiveI18n not initialized, cannot update default language');
-        return;
-    }
-    instance.updateDefaultLanguage(language);
+    console.warn('updateDefaultLanguage standalone function is deprecated. Use updateDefaultLanguage from useLiveI18n hook within LiveI18nProvider instead.');
 }
 /**
- * Get the current default language of the global instance
+ * Legacy function - use useLiveI18n hook instead
+ * @deprecated Use defaultLanguage from useLiveI18n hook within LiveI18nProvider instead
  */
 function getDefaultLanguage() {
-    const instance = getLiveI18nInstance();
-    if (!instance) {
-        console.warn('LiveI18n not initialized, cannot get default language');
-        return undefined;
-    }
-    return instance.getDefaultLanguage();
+    console.warn('getDefaultLanguage standalone function is deprecated. Use defaultLanguage from useLiveI18n hook within LiveI18nProvider instead.');
+    return undefined;
 }
 
 var LiveText$1 = /*#__PURE__*/Object.freeze({
     __proto__: null,
+    LiveI18nProvider: LiveI18nProvider,
     LiveText: LiveText,
     getDefaultLanguage: getDefaultLanguage,
     getLiveI18nInstance: getLiveI18nInstance,
@@ -685,5 +682,5 @@ async function translate(text, options) {
     return instance.translate(text, options);
 }
 
-export { LRUCache, LiveI18n, LiveText, LocalStorageCache, generateCacheKey, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n };
+export { LRUCache, LiveI18n, LiveI18nProvider, LiveText, LocalStorageCache, generateCacheKey, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n };
 //# sourceMappingURL=index.js.map
