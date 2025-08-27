@@ -9,12 +9,14 @@ export class LiveI18n {
   private cache: LRUCache<string, string> | LocalStorageCache;
   private endpoint: string;
   private defaultLanguage?: string;
+  private debug: boolean;
 
   constructor(config: LiveI18nConfig) {
     this.apiKey = config.apiKey;
     this.customerId = config.customerId;
     this.endpoint = config.endpoint || 'https://api.livei18n.com';
     this.defaultLanguage = config.defaultLanguage;
+    this.debug = config.debug || false;
     
     // Create appropriate cache based on configuration
     this.cache = this.createCache(config);
@@ -91,6 +93,12 @@ export class LiveI18n {
     return await response.json();
   }
 
+  private debugLog(message: string, ...params: any) {
+      if (this.debug) {
+          console.log(`[debug] ${message}`, params);
+      }
+  }
+
   /**
    * Translate text using the LiveI18n API with retry logic
    * Generates cache key and sends it to backend to eliminate drift
@@ -108,6 +116,8 @@ export class LiveI18n {
     const tone = (options?.tone || '').substring(0, 50);
     const context = (options?.context || '').substring(0, 500);
 
+    this.debugLog(`Attempting to translate ${JSON.stringify({text, tone, context, locale})}`);
+
     // Generate cache key using canonical algorithm
     const cacheKey = generateCacheKey(
       this.customerId,
@@ -117,9 +127,14 @@ export class LiveI18n {
       tone
     );
 
+    this.debugLog(`cache key for translation ${cacheKey}`);
+
     // Check local cache first
     const cached = this.cache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+        this.debugLog(`found translation in cache`);
+        return cached;
+    }
 
     const maxRetries = 5;
     const baseDelay = 100; // Start with 100ms

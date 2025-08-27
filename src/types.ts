@@ -9,6 +9,7 @@ export interface LiveI18nConfig {
   customerId: string;
   endpoint?: string;
   defaultLanguage?: string; // Global default language
+  debug?: boolean; // Show debug console logs
   cache?: {
     /** Use persistent localStorage cache */
     persistent?: boolean;

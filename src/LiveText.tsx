@@ -139,6 +139,9 @@ export const LiveText: React.FC<LiveTextProps> = ({
  */
 export function useLiveI18n() {
   const instance = getLiveI18nInstance();
+  const [defaultLanguage, setDefaultLanguage] = React.useState<string | undefined>(
+    instance?.getDefaultLanguage()
+  );
 
   const translate = async (text: string, options?: LiveTextOptions): Promise<string> => {
     if (!instance) {
@@ -148,18 +151,29 @@ export function useLiveI18n() {
     return instance.translate(text, options);
   };
 
+  const updateDefaultLanguage = (language?: string) => {
+    if (!instance) {
+      console.warn('LiveI18n not initialized, cannot update default language');
+      return;
+    }
+    instance.updateDefaultLanguage(language);
+    setDefaultLanguage(language); // Update React state to trigger re-renders
+  };
+
   return {
     translate,
-    defaultLanguage: instance?.getDefaultLanguage(),
+    defaultLanguage,
     clearCache: () => instance?.clearCache(),
     getCacheStats: () => instance?.getCacheStats() || { size: 0, maxSize: 0 },
-    updateDefaultLanguage: (language?: string) => instance?.updateDefaultLanguage(language),
+    updateDefaultLanguage,
     getDefaultLanguage: () => instance?.getDefaultLanguage()
   };
 }
 
 /**
  * Update the default language of the global instance
+ * Note: This standalone function won't trigger React re-renders
+ * Use the updateDefaultLanguage from useLiveI18n() hook for reactive updates
  */
 export function updateDefaultLanguage(language?: string): void {
   const instance = getLiveI18nInstance();
