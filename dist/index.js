@@ -1,5 +1,5 @@
 import { jsx, Fragment } from 'react/jsx-runtime';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const DEFAULT_CACHE_SIZE = 500;
 class LRUCache {
@@ -614,6 +614,7 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
  */
 function useLiveI18n() {
     const instance = getLiveI18nInstance();
+    const [defaultLanguage, setDefaultLanguage] = useState(instance === null || instance === void 0 ? void 0 : instance.getDefaultLanguage());
     const translate = async (text, options) => {
         if (!instance) {
             console.warn('LiveI18n not initialized, returning original text');
@@ -621,18 +622,20 @@ function useLiveI18n() {
         }
         return instance.translate(text, options);
     };
+    const updateDefaultLanguage = useCallback((language) => {
+        if (!instance) {
+            console.warn('LiveI18n not initialized, cannot update default language');
+            return;
+        }
+        instance.updateDefaultLanguage(language);
+        setDefaultLanguage(language);
+    }, [instance]);
     return {
         translate,
-        defaultLanguage: instance === null || instance === void 0 ? void 0 : instance.getDefaultLanguage(),
+        defaultLanguage,
         clearCache: () => instance === null || instance === void 0 ? void 0 : instance.clearCache(),
         getCacheStats: () => (instance === null || instance === void 0 ? void 0 : instance.getCacheStats()) || { size: 0, maxSize: 0 },
-        updateDefaultLanguage: (language) => {
-            if (!instance) {
-                console.warn('LiveI18n not initialized, cannot update default language');
-                return;
-            }
-            return instance.updateDefaultLanguage(language);
-        },
+        updateDefaultLanguage,
         getDefaultLanguage: () => instance === null || instance === void 0 ? void 0 : instance.getDefaultLanguage()
     };
 }

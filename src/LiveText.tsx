@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { LiveI18n } from './LiveI18n';
 import type { LiveTextOptions, LiveI18nConfig } from './types';
 
@@ -153,6 +153,9 @@ export const LiveText: React.FC<LiveTextProps> = ({
  */
 export function useLiveI18n() {
   const instance = getLiveI18nInstance();
+  const [defaultLanguage, setDefaultLanguage] = useState<string | undefined>(
+    instance?.getDefaultLanguage()
+  );
 
   const translate = async (text: string, options?: LiveTextOptions): Promise<string> => {
     if (!instance) {
@@ -162,18 +165,21 @@ export function useLiveI18n() {
     return instance.translate(text, options);
   };
 
+  const updateDefaultLanguage = useCallback((language?: string) => {
+    if (!instance) {
+      console.warn('LiveI18n not initialized, cannot update default language');
+      return;
+    }
+    instance.updateDefaultLanguage(language);
+    setDefaultLanguage(language);
+  }, [instance]);
+
   return {
     translate,
-    defaultLanguage: instance?.getDefaultLanguage(),
+    defaultLanguage,
     clearCache: () => instance?.clearCache(),
     getCacheStats: () => instance?.getCacheStats() || { size: 0, maxSize: 0 },
-    updateDefaultLanguage: (language?: string) => {
-      if (!instance) {
-        console.warn('LiveI18n not initialized, cannot update default language');
-        return;
-      }
-      return instance.updateDefaultLanguage(language);
-    },
+    updateDefaultLanguage,
     getDefaultLanguage: () => instance?.getDefaultLanguage()
   };
 }
