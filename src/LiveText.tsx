@@ -85,6 +85,20 @@ export const LiveText: React.FC<LiveTextProps> = ({
   const [translated, setTranslated] = useState(textContent);
   const [isLoading, setIsLoading] = useState(true);
   const [attempts, setAttempts] = useState(0);
+  const [forceRender, setForceRender] = useState(0); // For triggering re-renders
+  const instance = getLiveI18nInstance();
+
+  // Subscribe to language changes to trigger re-translation
+  useEffect(() => {
+    if (!instance) return;
+    
+    const unsubscribe = instance.addLanguageChangeListener(() => {
+      // Force re-render when default language changes
+      setForceRender(prev => prev + 1);
+    });
+
+    return unsubscribe; // Cleanup on unmount
+  }, [instance]);
 
 
   useEffect(() => {
@@ -97,7 +111,7 @@ export const LiveText: React.FC<LiveTextProps> = ({
   }, [attempts]);
 
   useEffect(() => {
-    if (!globalInstance) {
+    if (!instance) {
       setIsLoading(false);
       console.error('LiveI18n not initialized. Call initializeLiveI18n() first.');
       return;
@@ -115,8 +129,8 @@ export const LiveText: React.FC<LiveTextProps> = ({
       setAttempts(attempts)
     }
 
-    globalInstance
-      .translate(textContent, { tone, context, language }, )
+    instance
+      .translate(textContent, { tone, context, language }, onRetry)
       .then((result) => {
         setTranslated(result);
         onTranslationComplete?.(textContent, result);
@@ -129,7 +143,7 @@ export const LiveText: React.FC<LiveTextProps> = ({
       .finally(() => {
         setIsLoading(false);
       });
-  }, [textContent, tone, context, language, fallback, onTranslationComplete, onError]);
+  }, [textContent, tone, context, language, forceRender, fallback, onTranslationComplete, onError]);
 
   return <>{translated}</>;
 };
@@ -139,9 +153,6 @@ export const LiveText: React.FC<LiveTextProps> = ({
  */
 export function useLiveI18n() {
   const instance = getLiveI18nInstance();
-  const [defaultLanguage, setDefaultLanguage] = React.useState<string | undefined>(
-    instance?.getDefaultLanguage()
-  );
 
   const translate = async (text: string, options?: LiveTextOptions): Promise<string> => {
     if (!instance) {
@@ -151,21 +162,18 @@ export function useLiveI18n() {
     return instance.translate(text, options);
   };
 
-  const updateDefaultLanguage = (language?: string) => {
-    if (!instance) {
-      console.warn('LiveI18n not initialized, cannot update default language');
-      return;
-    }
-    instance.updateDefaultLanguage(language);
-    setDefaultLanguage(language); // Update React state to trigger re-renders
-  };
-
   return {
     translate,
-    defaultLanguage,
+    defaultLanguage: instance?.getDefaultLanguage(),
     clearCache: () => instance?.clearCache(),
     getCacheStats: () => instance?.getCacheStats() || { size: 0, maxSize: 0 },
-    updateDefaultLanguage,
+    updateDefaultLanguage: (language?: string) => {
+      if (!instance) {
+        console.warn('LiveI18n not initialized, cannot update default language');
+        return;
+      }
+      return instance.updateDefaultLanguage(language);
+    },
     getDefaultLanguage: () => instance?.getDefaultLanguage()
   };
 }

@@ -37,11 +37,13 @@ export declare function useLiveI18n(): {
         size: number;
         maxSize: number;
     };
-    updateDefaultLanguage: (language?: string) => void | undefined;
+    updateDefaultLanguage: (language?: string) => void;
     getDefaultLanguage: () => string | undefined;
 };
 /**
  * Update the default language of the global instance
+ * Note: This standalone function won't trigger React re-renders
+ * Use the updateDefaultLanguage from useLiveI18n() hook for reactive updates
  */
 export declare function updateDefaultLanguage(language?: string): void;
 /**

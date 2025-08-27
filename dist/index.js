@@ -297,12 +297,20 @@ function simpleHash(str) {
     return hex.length >= 8 ? hex : '0'.repeat(8 - hex.length) + hex;
 }
 
+class TranslationError extends Error {
+    constructor(message, code) {
+        super(message);
+        this.statusCode = code;
+    }
+}
 class LiveI18n {
     constructor(config) {
+        this.languageChangeListeners = [];
         this.apiKey = config.apiKey;
         this.customerId = config.customerId;
         this.endpoint = config.endpoint || 'https://api.livei18n.com';
         this.defaultLanguage = config.defaultLanguage;
+        this.debug = config.debug || false;
         // Create appropriate cache based on configuration
         this.cache = this.createCache(config);
     }
@@ -352,9 +360,14 @@ class LiveI18n {
             }),
         });
         if (!response.ok) {
-            throw new Error(`API error: ${response.status} ${response.statusText}`);
+            throw new TranslationError(`API error: ${response.status} ${response.statusText}. ${JSON.stringify(response.json())}`, response.status);
         }
         return await response.json();
+    }
+    debugLog(message, ...params) {
+        if (this.debug) {
+            console.log(`[debug] ${message}`, params);
+        }
     }
     /**
      * Translate text using the LiveI18n API with retry logic
@@ -372,12 +385,16 @@ class LiveI18n {
         const locale = (options === null || options === void 0 ? void 0 : options.language) || this.defaultLanguage || this.detectLocale();
         const tone = ((options === null || options === void 0 ? void 0 : options.tone) || '').substring(0, 50);
         const context = ((options === null || options === void 0 ? void 0 : options.context) || '').substring(0, 500);
+        this.debugLog(`Attempting to translate ${JSON.stringify({ text, tone, context, locale })}`);
         // Generate cache key using canonical algorithm
         const cacheKey = generateCacheKey(this.customerId, text, locale, context, tone);
+        this.debugLog(`cache key for translation ${cacheKey}`);
         // Check local cache first
         const cached = this.cache.get(cacheKey);
-        if (cached)
+        if (cached) {
+            this.debugLog(`found translation in cache`);
             return cached;
+        }
         const maxRetries = 5;
         const baseDelay = 100; // Start with 100ms
         const maxTotalTime = 5000; // 5 seconds total limit
@@ -412,6 +429,11 @@ class LiveI18n {
             catch (error) {
                 const isLastAttempt = attempt === maxRetries - 1;
                 const timeElapsed = Date.now() - startTime;
+                if ((error === null || error === void 0 ? void 0 : error.statusCode) && (error === null || error === void 0 ? void 0 : error.statusCode) === 400) {
+                    // don't retry on 400 errors
+                    console.error(`LiveI18n: Translation failed with status code: 400. Will not retry:`, error);
+                    return text; // Fallback to original text
+                }
                 if (isLastAttempt || timeElapsed >= maxTotalTime) {
                     console.error(`LiveI18n: Translation failed after ${attempt + 1} attempts:`, error);
                     return text; // Fallback to original text
@@ -450,12 +472,28 @@ class LiveI18n {
      */
     updateDefaultLanguage(language) {
         this.defaultLanguage = language;
+        // Notify all listeners of the language change
+        this.languageChangeListeners.forEach(listener => listener(language));
     }
     /**
      * Get the current default language
      */
     getDefaultLanguage() {
         return this.defaultLanguage;
+    }
+    /**
+     * Add a listener for default language changes
+     * Returns an unsubscribe function
+     */
+    addLanguageChangeListener(listener) {
+        this.languageChangeListeners.push(listener);
+        // Return unsubscribe function
+        return () => {
+            const index = this.languageChangeListeners.indexOf(listener);
+            if (index > -1) {
+                this.languageChangeListeners.splice(index, 1);
+            }
+        };
     }
     /**
      * Detect browser locale
@@ -519,6 +557,18 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
     const [translated, setTranslated] = useState(textContent);
     const [isLoading, setIsLoading] = useState(true);
     const [attempts, setAttempts] = useState(0);
+    const [forceRender, setForceRender] = useState(0); // For triggering re-renders
+    const instance = getLiveI18nInstance();
+    // Subscribe to language changes to trigger re-translation
+    useEffect(() => {
+        if (!instance)
+            return;
+        const unsubscribe = instance.addLanguageChangeListener(() => {
+            // Force re-render when default language changes
+            setForceRender(prev => prev + 1);
+        });
+        return unsubscribe; // Cleanup on unmount
+    }, [instance]);
     useEffect(() => {
         // if we are on a second attempt set loading to false
         // thhis way we can show the original text and exit the loading animation early
@@ -528,7 +578,7 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
         }
     }, [attempts]);
     useEffect(() => {
-        if (!globalInstance) {
+        if (!instance) {
             setIsLoading(false);
             console.error('LiveI18n not initialized. Call initializeLiveI18n() first.');
             return;
@@ -539,8 +589,11 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
             return;
         }
         setIsLoading(true);
-        globalInstance
-            .translate(textContent, { tone, context, language })
+        const onRetry = (attempts) => {
+            setAttempts(attempts);
+        };
+        instance
+            .translate(textContent, { tone, context, language }, onRetry)
             .then((result) => {
             setTranslated(result);
             onTranslationComplete === null || onTranslationComplete === void 0 ? void 0 : onTranslationComplete(textContent, result);
@@ -553,7 +606,7 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
             .finally(() => {
             setIsLoading(false);
         });
-    }, [textContent, tone, context, language, fallback, onTranslationComplete, onError]);
+    }, [textContent, tone, context, language, forceRender, fallback, onTranslationComplete, onError]);
     return jsx(Fragment, { children: translated });
 };
 /**
@@ -573,12 +626,20 @@ function useLiveI18n() {
         defaultLanguage: instance === null || instance === void 0 ? void 0 : instance.getDefaultLanguage(),
         clearCache: () => instance === null || instance === void 0 ? void 0 : instance.clearCache(),
         getCacheStats: () => (instance === null || instance === void 0 ? void 0 : instance.getCacheStats()) || { size: 0, maxSize: 0 },
-        updateDefaultLanguage: (language) => instance === null || instance === void 0 ? void 0 : instance.updateDefaultLanguage(language),
+        updateDefaultLanguage: (language) => {
+            if (!instance) {
+                console.warn('LiveI18n not initialized, cannot update default language');
+                return;
+            }
+            return instance.updateDefaultLanguage(language);
+        },
         getDefaultLanguage: () => instance === null || instance === void 0 ? void 0 : instance.getDefaultLanguage()
     };
 }
 /**
  * Update the default language of the global instance
+ * Note: This standalone function won't trigger React re-renders
+ * Use the updateDefaultLanguage from useLiveI18n() hook for reactive updates
  */
 function updateDefaultLanguage(language) {
     const instance = getLiveI18nInstance();

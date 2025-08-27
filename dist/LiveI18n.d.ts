@@ -1,10 +1,16 @@
 import type { LiveI18nConfig, LiveTextOptions } from './types';
+export declare class TranslationError extends Error {
+    statusCode: number;
+    constructor(message: string, code: number);
+}
 export declare class LiveI18n {
     private apiKey;
     private customerId;
     private cache;
     private endpoint;
     private defaultLanguage?;
+    private debug;
+    private languageChangeListeners;
     constructor(config: LiveI18nConfig);
     private createCache;
     /**
@@ -15,6 +21,7 @@ export declare class LiveI18n {
      * Make a single translation request attempt
      */
     private makeTranslationRequest;
+    private debugLog;
     /**
      * Translate text using the LiveI18n API with retry logic
      * Generates cache key and sends it to backend to eliminate drift
@@ -40,6 +47,11 @@ export declare class LiveI18n {
      * Get the current default language
      */
     getDefaultLanguage(): string | undefined;
+    /**
+     * Add a listener for default language changes
+     * Returns an unsubscribe function
+     */
+    addLanguageChangeListener(listener: (language?: string) => void): () => void;
     /**
      * Detect browser locale
      */

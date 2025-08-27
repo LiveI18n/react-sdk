@@ -3,6 +3,15 @@ import { LocalStorageCache } from './LocalStorageCache';
 import { generateCacheKey } from './cacheKey';
 import type { LiveI18nConfig, LiveTextOptions, TranslationResponse } from './types';
 
+export class TranslationError extends Error {
+  statusCode: number;
+
+  constructor(message: string, code: number) {
+    super(message);
+    this.statusCode = code;
+  }
+}
+
 export class LiveI18n {
   private apiKey: string;
   private customerId: string;
@@ -10,6 +19,7 @@ export class LiveI18n {
   private endpoint: string;
   private defaultLanguage?: string;
   private debug: boolean;
+  private languageChangeListeners: Array<(language?: string) => void> = [];
 
   constructor(config: LiveI18nConfig) {
     this.apiKey = config.apiKey;
@@ -87,7 +97,7 @@ export class LiveI18n {
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      throw new TranslationError(`API error: ${response.status} ${response.statusText}. ${response.json()}`, response.status);
     }
 
     return await response.json();
@@ -173,10 +183,16 @@ export class LiveI18n {
         }
 
         return result.translated;
-      } catch (error) {
+      } catch (error: any) {
         const isLastAttempt = attempt === maxRetries - 1;
         const timeElapsed = Date.now() - startTime;
         
+        if (error?.statusCode && error?.statusCode === 400) {
+          // don't retry on 400 errors
+          console.error(`LiveI18n: Translation failed with status code: 400. Will not retry:`, error);
+          return text; // Fallback to original text
+        }
+
         if (isLastAttempt || timeElapsed >= maxTotalTime) {
           console.error(`LiveI18n: Translation failed after ${attempt + 1} attempts:`, error);
           return text; // Fallback to original text
@@ -223,6 +239,8 @@ export class LiveI18n {
    */
   updateDefaultLanguage(language?: string): void {
     this.defaultLanguage = language;
+    // Notify all listeners of the language change
+    this.languageChangeListeners.forEach(listener => listener(language));
   }
 
   /**
@@ -230,6 +248,22 @@ export class LiveI18n {
    */
   getDefaultLanguage(): string | undefined {
     return this.defaultLanguage;
+  }
+
+  /**
+   * Add a listener for default language changes
+   * Returns an unsubscribe function
+   */
+  addLanguageChangeListener(listener: (language?: string) => void): () => void {
+    this.languageChangeListeners.push(listener);
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.languageChangeListeners.indexOf(listener);
+      if (index > -1) {
+        this.languageChangeListeners.splice(index, 1);
+      }
+    };
   }
 
 
