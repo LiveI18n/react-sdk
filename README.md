@@ -10,17 +10,23 @@ npm install @livei18n/react-sdk
 
 ## Quick Start
 
-### 1. Initialize the SDK
+### 1. Setup the Provider
 
 ```typescript
-import { initializeLiveI18n } from '@livei18n/react-sdk';
+import { LiveI18nProvider } from '@livei18n/react-sdk';
 
-// Initialize once in your app root
-initializeLiveI18n({
-  apiKey: 'your-api-key',
-  customerId: 'your-customer-id',
-  defaultLanguage: 'es-ES' // optional - target language for translations
-});
+// Wrap your app with the provider
+function App() {
+  return (
+    <LiveI18nProvider config={{
+      apiKey: 'your-api-key',
+      customerId: 'your-customer-id',
+      defaultLanguage: 'es-ES' // optional - target language for translations
+    }}>
+      <YourApp />
+    </LiveI18nProvider>
+  );
+}
 ```
 
 ### 2. Use the LiveText Component
@@ -28,7 +34,7 @@ initializeLiveI18n({
 ```jsx
 import { LiveText } from '@livei18n/react-sdk';
 
-function App() {
+function YourApp() {
   return (
     <div>
       <h1>
@@ -54,7 +60,7 @@ function App() {
 import { useLiveI18n } from '@livei18n/react-sdk';
 
 function MyComponent() {
-  const { translate } = useLiveI18n();
+  const { translate, defaultLanguage, updateDefaultLanguage } = useLiveI18n();
   
   const handleClick = async () => {
     const translated = await translate('Hello World', {
@@ -64,7 +70,17 @@ function MyComponent() {
     console.log(translated);
   };
   
-  return <button onClick={handleClick}>Translate</button>;
+  const switchLanguage = () => {
+    updateDefaultLanguage('fr-FR'); // All LiveText components will re-render
+  };
+  
+  return (
+    <div>
+      <p>Current language: {defaultLanguage || 'auto-detect'}</p>
+      <button onClick={handleClick}>Translate</button>
+      <button onClick={switchLanguage}>Switch to French</button>
+    </div>
+  );
 }
 ```
 
@@ -84,13 +100,32 @@ function MyComponent() {
 
 ### useLiveI18n Hook
 
+**Must be used within `LiveI18nProvider`**
+
 Returns an object with:
 
 - `translate(text, options)` - Translate text programmatically
+- `defaultLanguage` - Current default language (reactive state)
 - `clearCache()` - Clear local translation cache
 - `getCacheStats()` - Get cache statistics
-- `updateDefaultLanguage(language?)` - Update the default language
+- `updateDefaultLanguage(language?)` - Update the default language (triggers re-renders)
 - `getDefaultLanguage()` - Get the current default language
+
+### LiveI18nProvider Component
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `config` | `LiveI18nConfig` | Configuration object with API credentials |
+| `children` | `ReactNode` | Child components that will have access to translation |
+
+### LiveI18nConfig
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `apiKey` | `string` | Your LiveI18n API key |
+| `customerId` | `string` | Your customer ID |
+| `defaultLanguage` | `string?` | Default target language (optional) |
+| `cache` | `object?` | Cache configuration (optional) |
 
 ## Configuration
 
@@ -100,42 +135,96 @@ The `defaultLanguage` option controls the target language for all translations w
 
 **Auto-detection (recommended for global apps):**
 ```typescript
-initializeLiveI18n({
+<LiveI18nProvider config={{
   apiKey: 'your-api-key',
   customerId: 'your-customer-id'
   // No defaultLanguage - uses browser language
-});
+}}>
+  <App />
+</LiveI18nProvider>
 ```
 
 **Fixed language (recommended for region-specific apps):**
 ```typescript
-initializeLiveI18n({
+<LiveI18nProvider config={{
   apiKey: 'your-api-key',
   customerId: 'your-customer-id',
   defaultLanguage: 'es-ES' // Always translate to Spanish
-});
+}}>
+  <App />
+</LiveI18nProvider>
 ```
 
 **Dynamic language switching:**
 ```typescript
-import { updateDefaultLanguage } from '@livei18n/react-sdk';
+function LanguageSwitcher() {
+  const { updateDefaultLanguage } = useLiveI18n();
+  
+  return (
+    <div>
+      <button onClick={() => updateDefaultLanguage('fr-FR')}>
+        Switch to French
+      </button>
+      <button onClick={() => updateDefaultLanguage(undefined)}>
+        Auto-detect language
+      </button>
+    </div>
+  );
+}
+```
 
-// Switch to French
-updateDefaultLanguage('fr-FR');
+### Advanced Configuration
 
-// Enable auto-detection
-updateDefaultLanguage(undefined);
+```typescript
+<LiveI18nProvider config={{
+  apiKey: 'your-api-key',
+  customerId: 'your-customer-id',
+  defaultLanguage: 'es-ES',
+  cache: {
+    preload: true,        // Preload cache from localStorage
+    entrySize: 1000,      // Max cache entries
+    ttlHours: 3,          // Cache TTL in hours
+    persistent: true      // Use localStorage + memory cache
+  }
+}}>
+  <App />
+</LiveI18nProvider>
 ```
 
 ## Features
 
-- ✅ Automatic caching (500 entries, 1 hour TTL)
-- ✅ Graceful fallback to original text
-- ✅ TypeScript support
-- ✅ Real-time translation
-- ✅ Context-aware translations
-- ✅ Tone control
-- ✅ Default language configuration
+- ✅ **React Context Provider** - Clean, modern React architecture
+- ✅ **Automatic Re-renders** - Components automatically update when language changes
+- ✅ **Automatic caching** - 500 entries, 1 hour TTL by default
+- ✅ **Graceful fallback** to original text on errors
+- ✅ **TypeScript support** with full type definitions
+- ✅ **Real-time translation** with retry logic
+- ✅ **Context-aware translations** for better accuracy
+- ✅ **Tone control** (formal, casual, etc.)
+- ✅ **Reactive language switching** with instant UI updates
+- ✅ **localStorage persistence** for cached translations
+
+## Migration from Legacy API
+
+If you're upgrading from an older version that used `initializeLiveI18n()`:
+
+```typescript
+// OLD (deprecated)
+import { initializeLiveI18n } from '@livei18n/react-sdk';
+initializeLiveI18n({ apiKey: '...', customerId: '...' });
+
+// NEW (recommended)
+import { LiveI18nProvider } from '@livei18n/react-sdk';
+<LiveI18nProvider config={{ apiKey: '...', customerId: '...' }}>
+  <App />
+</LiveI18nProvider>
+```
+
+The legacy functions still work but will show deprecation warnings. The new provider pattern offers:
+- Better React integration
+- Automatic re-renders on language changes
+- No global state management
+- Easier testing
 
 ## Cache Key Algorithm
 
