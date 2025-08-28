@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState, useCallback, createContext, useContext } from 'react';
 import { LiveI18n } from './LiveI18n';
 import type { LiveTextOptions, LiveI18nConfig } from './types';
