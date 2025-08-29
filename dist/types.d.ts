@@ -9,7 +9,7 @@ export interface LiveI18nConfig {
     endpoint?: string;
     defaultLanguage?: string;
     debug?: boolean;
-    /** Enable request batching for better performance (default: false) */
+    /** Enable request batching for better performance (default: true) */
     batch_requests?: boolean;
     cache?: {
         /** Use persistent localStorage cache */
