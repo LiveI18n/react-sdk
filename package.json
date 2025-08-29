@@ -1,6 +1,6 @@
 {
   "name": "@livei18n/react-sdk",
-  "version": "1.0.4,
+  "version": "1.0.4",
   "description": "React SDK for LiveI18n real-time translation platform",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
