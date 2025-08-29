@@ -125,6 +125,8 @@ Returns an object with:
 | `apiKey` | `string` | Your LiveI18n API key |
 | `customerId` | `string` | Your customer ID |
 | `defaultLanguage` | `string?` | Default target language (optional) |
+| `batch_requests` | `boolean?` | Enable request batching for efficiency (default: true) |
+| `debug` | `boolean?` | Enable debug logging (default: false) |
 | `cache` | `object?` | Cache configuration (optional) |
 
 ## Configuration
@@ -180,21 +182,54 @@ function LanguageSwitcher() {
   apiKey: 'your-api-key',
   customerId: 'your-customer-id',
   defaultLanguage: 'es-ES',
+  batch_requests: true,     // Enable batching (default: true)
+  debug: false,             // Enable debug logging (default: false)
   cache: {
-    preload: true,        // Preload cache from localStorage
-    entrySize: 1000,      // Max cache entries
-    ttlHours: 3,          // Cache TTL in hours
-    persistent: true      // Use localStorage + memory cache
+    preload: true,          // Preload cache from localStorage
+    entrySize: 1000,        // Max cache entries
+    ttlHours: 3,            // Cache TTL in hours
+    persistent: true        // Use localStorage + memory cache
   }
 }}>
   <App />
 </LiveI18nProvider>
 ```
 
+### Request Batching
+
+By default, the SDK automatically batches translation requests that aren't found in cache for improved performance:
+
+```typescript
+<LiveI18nProvider config={{
+  apiKey: 'your-api-key',
+  customerId: 'your-customer-id',
+  batch_requests: true  // Default: true
+}}>
+  <div>
+    {/* These requests will be batched together if not cached */}
+    <LiveText>Hello</LiveText>
+    <LiveText>World</LiveText>
+    <LiveText>Welcome</LiveText>
+  </div>
+</LiveI18nProvider>
+```
+
+**Batching behavior:**
+- Only requests that miss cache are batched
+- Batches are sent when 10 requests are queued OR after 50ms timeout
+- If batch API fails, individual requests are sent as fallback
+- Can be disabled by setting `batch_requests: false`
+
+**Benefits:**
+- Reduces API calls and latency
+- More efficient for apps with many simultaneous translations
+- Transparent to your components - no code changes needed
+
 ## Features
 
 - ✅ **React Context Provider** - Clean, modern React architecture
 - ✅ **Automatic Re-renders** - Components automatically update when language changes
+- ✅ **Request Batching** - Multiple translation requests are batched for efficiency (10 requests or 50ms timeout)
 - ✅ **Automatic caching** - 500 entries, 1 hour TTL by default
 - ✅ **Graceful fallback** to original text on errors
 - ✅ **TypeScript support** with full type definitions
