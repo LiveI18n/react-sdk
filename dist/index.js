@@ -306,11 +306,15 @@ class TranslationError extends Error {
 class LiveI18n {
     constructor(config) {
         this.languageChangeListeners = [];
+        // Batching-related properties
+        this.translationQueue = [];
+        this.queueTimer = null;
         this.apiKey = config.apiKey;
         this.customerId = config.customerId;
         this.endpoint = config.endpoint || 'https://api.livei18n.com';
         this.defaultLanguage = config.defaultLanguage;
         this.debug = config.debug || false;
+        this.batchRequests = config.batch_requests || false;
         // Create appropriate cache based on configuration
         this.cache = this.createCache(config);
     }
@@ -395,6 +399,28 @@ class LiveI18n {
             this.debugLog(`found translation in cache`);
             return cached;
         }
+        // Branch based on configuration
+        if (this.batchRequests) {
+            // NEW: Batch mode - add to queue
+            this.debugLog('cache miss, adding to batch queue');
+            return this.addToQueue({
+                text,
+                options,
+                cacheKey,
+                resolve: () => { }, // Will be set in addToQueue
+                reject: () => { } // Will be set in addToQueue
+            });
+        }
+        else {
+            // EXISTING: Individual mode - direct API call
+            this.debugLog('cache miss, making individual translation request');
+            return this.makeIndividualTranslation(text, locale, tone, context, cacheKey, onRetry);
+        }
+    }
+    /**
+     * Make individual translation (existing logic moved here)
+     */
+    async makeIndividualTranslation(text, locale, tone, context, cacheKey, onRetry) {
         const maxRetries = 5;
         const baseDelay = 100; // Start with 100ms
         const maxTotalTime = 5000; // 5 seconds total limit
@@ -451,6 +477,165 @@ class LiveI18n {
         }
         // Should not reach here, but fallback just in case
         return text;
+    }
+    /**
+     * Add translation request to batch queue
+     */
+    addToQueue(queuedTranslation) {
+        return new Promise((resolve, reject) => {
+            // Set the resolve and reject functions
+            queuedTranslation.resolve = resolve;
+            queuedTranslation.reject = reject;
+            // Add to queue
+            this.translationQueue.push(queuedTranslation);
+            this.debugLog(`Added to queue, queue size: ${this.translationQueue.length}`);
+            // Auto-flush conditions: 10 requests or start timer
+            if (this.translationQueue.length >= 10) {
+                this.debugLog('Queue full (10 requests), flushing immediately');
+                this.flushQueue();
+            }
+            else if (!this.queueTimer) {
+                this.debugLog('Starting 50ms queue timer');
+                this.queueTimer = setTimeout(() => this.flushQueue(), 50);
+            }
+        });
+    }
+    /**
+     * Flush the translation queue
+     */
+    async flushQueue() {
+        var _a, _b, _c;
+        // Clear the timer
+        if (this.queueTimer) {
+            clearTimeout(this.queueTimer);
+            this.queueTimer = null;
+        }
+        // Get current queue and reset
+        const currentQueue = [...this.translationQueue];
+        this.translationQueue = [];
+        if (currentQueue.length === 0) {
+            this.debugLog('Queue flush called but queue is empty');
+            return;
+        }
+        this.debugLog(`Flushing queue with ${currentQueue.length} translations`);
+        try {
+            // Call batch translation API
+            const results = await this.translateBatch(currentQueue);
+            // Resolve each promise with its result
+            for (let i = 0; i < currentQueue.length; i++) {
+                const queueItem = currentQueue[i];
+                const result = results[i];
+                if (result) {
+                    // Cache the result locally
+                    this.cache.set(queueItem.cacheKey, result);
+                    queueItem.resolve(result);
+                }
+                else {
+                    // Fallback to original text if no result
+                    queueItem.resolve(queueItem.text);
+                }
+            }
+        }
+        catch (error) {
+            this.debugLog('Batch translation failed, falling back to individual requests');
+            // Detect locale once for efficiency
+            const detectedLocale = this.detectLocale();
+            // Fallback: process each translation individually
+            for (const queueItem of currentQueue) {
+                try {
+                    const locale = ((_a = queueItem.options) === null || _a === void 0 ? void 0 : _a.language) || this.defaultLanguage || detectedLocale;
+                    const tone = (((_b = queueItem.options) === null || _b === void 0 ? void 0 : _b.tone) || '').substring(0, 50);
+                    const context = (((_c = queueItem.options) === null || _c === void 0 ? void 0 : _c.context) || '').substring(0, 500);
+                    const result = await this.makeIndividualTranslation(queueItem.text, locale, tone, context, queueItem.cacheKey);
+                    queueItem.resolve(result);
+                }
+                catch (individualError) {
+                    console.error('Individual fallback translation failed:', individualError);
+                    queueItem.reject(individualError);
+                }
+            }
+        }
+    }
+    /**
+     * Make batch translation request to API
+     */
+    async translateBatch(queuedTranslations) {
+        var _a, _b, _c;
+        // Detect locale once for efficiency
+        const detectedLocale = this.detectLocale();
+        // Prepare batch request (filtering out texts that are too long)
+        const requests = [];
+        const validIndices = [];
+        for (let i = 0; i < queuedTranslations.length; i++) {
+            const queued = queuedTranslations[i];
+            // Check text length (same as individual translate method)
+            if (queued.text.length > 5000) {
+                console.error('LiveI18n: Text exceeds 5000 character limit in batch request');
+                // This translation will return original text
+                continue;
+            }
+            const locale = ((_a = queued.options) === null || _a === void 0 ? void 0 : _a.language) || this.defaultLanguage || detectedLocale;
+            const tone = (((_b = queued.options) === null || _b === void 0 ? void 0 : _b.tone) || '').substring(0, 50); // Truncate like individual method
+            const context = (((_c = queued.options) === null || _c === void 0 ? void 0 : _c.context) || '').substring(0, 500); // Truncate like individual method
+            requests.push({
+                text: queued.text,
+                locale,
+                tone,
+                context,
+                cache_key: queued.cacheKey
+            });
+            validIndices.push(i);
+        }
+        this.debugLog(`Making batch request with ${requests.length} valid translations (${queuedTranslations.length - requests.length} filtered out)`);
+        // If no valid requests, return all original texts
+        if (requests.length === 0) {
+            return queuedTranslations.map(q => q.text);
+        }
+        const response = await fetch(`${this.endpoint}/api/v1/translate_batch`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': this.apiKey,
+                'X-Customer-ID': this.customerId,
+            },
+            body: JSON.stringify({
+                requests: requests
+            }),
+        });
+        if (!response.ok) {
+            throw new TranslationError(`Batch API error: ${response.status} ${response.statusText}`, response.status);
+        }
+        const batchResponse = await response.json();
+        // Map responses back to the original order by cache_key
+        const results = new Array(queuedTranslations.length);
+        // Fill in results for valid translations
+        for (let i = 0; i < validIndices.length; i++) {
+            const originalIndex = validIndices[i];
+            const originalCacheKey = queuedTranslations[originalIndex].cacheKey;
+            const responseItem = batchResponse.responses.find(r => r.cache_key === originalCacheKey);
+            if (responseItem) {
+                results[originalIndex] = responseItem.translated;
+                // Log warnings for low confidence translations
+                if (responseItem.confidence < 0.4) {
+                    console.warn(`LiveI18n: Low confidence batch translation (${responseItem.confidence}):`, {
+                        original: queuedTranslations[originalIndex].text,
+                        translated: responseItem.translated
+                    });
+                }
+            }
+            else {
+                // Fallback if response not found
+                results[originalIndex] = queuedTranslations[originalIndex].text;
+                console.warn(`LiveI18n: No batch response found for cache key: ${originalCacheKey}`);
+            }
+        }
+        // Fill in original text for invalid translations (text too long)
+        for (let i = 0; i < queuedTranslations.length; i++) {
+            if (results[i] === undefined) {
+                results[i] = queuedTranslations[i].text; // Return original text for filtered items
+            }
+        }
+        return results;
     }
     /**
      * Clear local cache

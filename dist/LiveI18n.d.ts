@@ -10,7 +10,10 @@ export declare class LiveI18n {
     private endpoint;
     private defaultLanguage?;
     private debug;
+    private batchRequests;
     private languageChangeListeners;
+    private translationQueue;
+    private queueTimer;
     constructor(config: LiveI18nConfig);
     private createCache;
     /**
@@ -28,6 +31,22 @@ export declare class LiveI18n {
      * Retries up to 5 times with exponential backoff, max 5 seconds total
      */
     translate(text: string, options?: LiveTextOptions, onRetry?: (attempt: number) => void): Promise<string>;
+    /**
+     * Make individual translation (existing logic moved here)
+     */
+    private makeIndividualTranslation;
+    /**
+     * Add translation request to batch queue
+     */
+    private addToQueue;
+    /**
+     * Flush the translation queue
+     */
+    private flushQueue;
+    /**
+     * Make batch translation request to API
+     */
+    private translateBatch;
     /**
      * Clear local cache
      */
