@@ -32,7 +32,7 @@ export class LiveI18n {
     this.endpoint = config.endpoint || 'https://api.livei18n.com';
     this.defaultLanguage = config.defaultLanguage;
     this.debug = config.debug || false;
-    this.batchRequests = config.batch_requests || true;
+    this.batchRequests = config.batch_requests ?? true;
     
     // Create appropriate cache based on configuration
     this.cache = this.createCache(config);
