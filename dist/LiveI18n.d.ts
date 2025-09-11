@@ -44,6 +44,11 @@ export declare class LiveI18n {
      */
     private flushQueue;
     /**
+     * Make batch translation request with retry logic
+     * Never throws - always returns results array (original text for failures)
+     */
+    private translateBatchWithRetry;
+    /**
      * Make batch translation request to API
      */
     private translateBatch;
