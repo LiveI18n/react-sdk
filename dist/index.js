@@ -305,6 +305,7 @@ class TranslationError extends Error {
 }
 class LiveI18n {
     constructor(config) {
+        var _a;
         this.languageChangeListeners = [];
         // Batching-related properties
         this.translationQueue = [];
@@ -314,7 +315,7 @@ class LiveI18n {
         this.endpoint = config.endpoint || 'https://api.livei18n.com';
         this.defaultLanguage = config.defaultLanguage;
         this.debug = config.debug || false;
-        this.batchRequests = config.batch_requests || true;
+        this.batchRequests = (_a = config.batch_requests) !== null && _a !== void 0 ? _a : true;
         // Create appropriate cache based on configuration
         this.cache = this.createCache(config);
     }
