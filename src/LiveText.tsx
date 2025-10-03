@@ -211,7 +211,8 @@ export function useLiveI18n() {
     clearCache: () => instance.clearCache(),
     getCacheStats: () => instance.getCacheStats() || { size: 0, maxSize: 0 },
     updateDefaultLanguage: context.updateDefaultLanguage,
-    getDefaultLanguage: () => instance.getDefaultLanguage()
+    getDefaultLanguage: () => instance.getDefaultLanguage(),
+    getSupportedLanguages: (all?: boolean) => instance.getSupportedLanguages(all)
   };
 }
 
