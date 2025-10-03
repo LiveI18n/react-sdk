@@ -49,6 +49,7 @@ export declare function useLiveI18n(): {
     };
     updateDefaultLanguage: (language?: string) => void;
     getDefaultLanguage: () => string | undefined;
+    getSupportedLanguages: (all?: boolean) => Promise<import("./types").SupportedLanguagesResponse>;
 };
 /**
  * Legacy function - use useLiveI18n hook instead

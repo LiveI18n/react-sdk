@@ -1,4 +1,4 @@
-import type { LiveI18nConfig, LiveTextOptions } from './types';
+import type { LiveI18nConfig, LiveTextOptions, SupportedLanguagesResponse } from './types';
 export declare class TranslationError extends Error {
     statusCode: number;
     constructor(message: string, code: number);
@@ -14,6 +14,7 @@ export declare class LiveI18n {
     private languageChangeListeners;
     private translationQueue;
     private queueTimer;
+    private supportedLanguagesCache;
     constructor(config: LiveI18nConfig);
     private createCache;
     /**
@@ -76,6 +77,12 @@ export declare class LiveI18n {
      * Returns an unsubscribe function
      */
     addLanguageChangeListener(listener: (language?: string) => void): () => void;
+    /**
+     * Get supported languages from the API
+     * @param all - If true, returns all supported languages. If false/undefined, returns top 20
+     * @returns Promise resolving to supported languages response
+     */
+    getSupportedLanguages(all?: boolean): Promise<SupportedLanguagesResponse>;
     /**
      * Detect browser locale
      */

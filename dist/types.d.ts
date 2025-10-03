@@ -50,3 +50,12 @@ export interface BatchTranslationResponse {
         confidence: number;
     }>;
 }
+export interface SupportedLanguage {
+    name: string;
+    locale: string;
+    flag: string;
+}
+export interface SupportedLanguagesResponse {
+    languages: SupportedLanguage[];
+    total: number;
+}
