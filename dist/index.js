@@ -920,6 +920,55 @@ var LiveText$1 = /*#__PURE__*/Object.freeze({
     useLiveI18n: useLiveI18n
 });
 
+/**
+ * Hook for programmatic text translation that returns a string value
+ *
+ * @param text - The text to translate
+ * @param options - Translation options (context, tone, language)
+ * @returns The translated text (starts with original, updates when translation completes)
+ *
+ * @example
+ * ```tsx
+ * const greeting = useLiveText("Hello World");
+ * const formalGreeting = useLiveText("Welcome", {
+ *   context: "homepage",
+ *   tone: "professional"
+ * });
+ * const spanishText = useLiveText("Good morning", {
+ *   language: "es-ES"
+ * });
+ * ```
+ */
+function useLiveText(text, options) {
+    const [translatedText, setTranslatedText] = useState(text);
+    const { translate, defaultLanguage } = useLiveI18n();
+    useEffect(() => {
+        // Don't translate empty strings
+        if (!text.trim()) {
+            setTranslatedText(text);
+            return;
+        }
+        // Perform translation
+        translate(text, options)
+            .then((result) => {
+            setTranslatedText(result);
+        })
+            .catch((error) => {
+            console.error('useLiveText translation failed:', error);
+            // Fallback to original text on error
+            setTranslatedText(text);
+        });
+    }, [
+        text,
+        options === null || options === void 0 ? void 0 : options.context,
+        options === null || options === void 0 ? void 0 : options.tone,
+        options === null || options === void 0 ? void 0 : options.language,
+        defaultLanguage, // Re-translate when default language changes
+        translate
+    ]);
+    return translatedText;
+}
+
 // Direct translate function for convenience
 async function translate(text, options) {
     const { getLiveI18nInstance } = await Promise.resolve().then(function () { return LiveText$1; });
@@ -931,5 +980,5 @@ async function translate(text, options) {
     return instance.translate(text, options);
 }
 
-export { LRUCache, LiveI18n, LiveI18nProvider, LiveText, LocalStorageCache, generateCacheKey, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n };
+export { LRUCache, LiveI18n, LiveI18nProvider, LiveText, LocalStorageCache, generateCacheKey, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n, useLiveText };
 //# sourceMappingURL=index.js.map
