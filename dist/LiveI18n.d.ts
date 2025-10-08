@@ -1,3 +1,4 @@
+import { type LoadingPattern } from './loadingIndicator';
 import type { LiveI18nConfig, LiveTextOptions, SupportedLanguagesResponse } from './types';
 export declare class TranslationError extends Error {
     statusCode: number;
@@ -11,6 +12,7 @@ export declare class LiveI18n {
     private defaultLanguage?;
     private debug;
     private batchRequests;
+    private loadingPattern;
     private languageChangeListeners;
     private translationQueue;
     private queueTimer;
@@ -72,6 +74,10 @@ export declare class LiveI18n {
      * Get the current default language
      */
     getDefaultLanguage(): string | undefined;
+    /**
+     * Get the current loading pattern configuration
+     */
+    getLoadingPattern(): LoadingPattern;
     /**
      * Add a listener for default language changes
      * Returns an unsubscribe function

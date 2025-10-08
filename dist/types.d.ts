@@ -21,6 +21,10 @@ export interface LiveI18nConfig {
         /** Preload cache on initialization (default: true) */
         preload?: boolean;
     };
+    loading?: {
+        /** Loading indicator pattern: 'dots', 'blocks', or 'none' (default: 'none') */
+        pattern?: 'dots' | 'blocks' | 'none';
+    };
 }
 export interface TranslationResponse {
     translated: string;

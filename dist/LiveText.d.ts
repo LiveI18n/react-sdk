@@ -1,6 +1,12 @@
 import React from 'react';
 import { LiveI18n } from './LiveI18n';
 import type { LiveTextOptions, LiveI18nConfig } from './types';
+interface LiveI18nContextValue {
+    instance: LiveI18n | null;
+    defaultLanguage: string | undefined;
+    updateDefaultLanguage: (language?: string) => void;
+}
+export declare const LiveI18nContext: React.Context<LiveI18nContextValue>;
 /**
  * Legacy function - use LiveI18nProvider instead
  * @deprecated Use LiveI18nProvider component instead
@@ -61,3 +67,4 @@ export declare function updateDefaultLanguage(language?: string): void;
  * @deprecated Use defaultLanguage from useLiveI18n hook within LiveI18nProvider instead
  */
 export declare function getDefaultLanguage(): string | undefined;
+export {};

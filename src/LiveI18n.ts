@@ -1,6 +1,7 @@
 import { LRUCache, DEFAULT_CACHE_SIZE } from './LRUCache';
 import { LocalStorageCache } from './LocalStorageCache';
 import { generateCacheKey } from './cacheKey';
+import { DEFAULT_LOADING_CONFIG, type LoadingPattern } from './loadingIndicator';
 import type { LiveI18nConfig, LiveTextOptions, TranslationResponse, QueuedTranslation, BatchTranslationRequest, BatchTranslationResponse, SupportedLanguagesResponse } from './types';
 
 export class TranslationError extends Error {
@@ -20,6 +21,7 @@ export class LiveI18n {
   private defaultLanguage?: string;
   private debug: boolean;
   private batchRequests: boolean;
+  private loadingPattern: LoadingPattern;
   private languageChangeListeners: Array<(language?: string) => void> = [];
   
   // Batching-related properties
@@ -36,6 +38,7 @@ export class LiveI18n {
     this.defaultLanguage = config.defaultLanguage;
     this.debug = config.debug || false;
     this.batchRequests = config.batch_requests ?? true;
+    this.loadingPattern = config.loading?.pattern || DEFAULT_LOADING_CONFIG.pattern;
     
     // Create appropriate cache based on configuration
     this.cache = this.createCache(config);
@@ -491,6 +494,13 @@ export class LiveI18n {
    */
   getDefaultLanguage(): string | undefined {
     return this.defaultLanguage;
+  }
+
+  /**
+   * Get the current loading pattern configuration
+   */
+  getLoadingPattern(): LoadingPattern {
+    return this.loadingPattern;
   }
 
   /**

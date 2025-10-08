@@ -297,6 +297,54 @@ function simpleHash(str) {
     return hex.length >= 8 ? hex : '0'.repeat(8 - hex.length) + hex;
 }
 
+/**
+ * Default loading indicator configuration
+ */
+const DEFAULT_LOADING_CONFIG = {
+    pattern: 'none'
+};
+/**
+ * Generates a loading text pattern that matches the length and structure of the original text
+ * Replaces all characters except spaces with the specified pattern while preserving layout
+ *
+ * @param originalText - The original text to create a loading pattern for
+ * @param pattern - The loading pattern to use ('dots', 'blocks', or 'none')
+ * @returns Loading text with same length and structure, or original text if pattern is 'none'
+ *
+ * @example
+ * generateLoadingText("Hello World!", 'dots') → "••••• ••••••"
+ * generateLoadingText("Hello World!", 'blocks') → "▮▮▮▮▮ ▮▮▮▮▮▮"
+ * generateLoadingText("Hello World!", 'none') → "Hello World!"
+ * generateLoadingText("Welcome back", 'dots') → "••••••• ••••"
+ * generateLoadingText("Welcome back", 'blocks') → "▮▮▮▮▮▮▮ ▮▮▮▮"
+ */
+function generateLoadingText(originalText, pattern = 'none') {
+    // Return original text if no loading pattern is desired
+    if (pattern === 'none') {
+        return originalText;
+    }
+    let result = '';
+    for (let i = 0; i < originalText.length; i++) {
+        const char = originalText[i];
+        // Replace all non-space characters with the specified pattern
+        if (char === ' ') {
+            // Preserve spaces for layout
+            result += char;
+        }
+        else {
+            // Replace letters, numbers, punctuation, and special characters
+            if (pattern === 'blocks') {
+                result += '▮'; // U+25AE (Black vertical rectangle)
+            }
+            else {
+                // 'dots' pattern - consistent medium dots
+                result += '•'; // U+2022 (Bullet)
+            }
+        }
+    }
+    return result;
+}
+
 class TranslationError extends Error {
     constructor(message, code) {
         super(message);
@@ -305,7 +353,7 @@ class TranslationError extends Error {
 }
 class LiveI18n {
     constructor(config) {
-        var _a;
+        var _a, _b;
         this.languageChangeListeners = [];
         // Batching-related properties
         this.translationQueue = [];
@@ -318,6 +366,7 @@ class LiveI18n {
         this.defaultLanguage = config.defaultLanguage;
         this.debug = config.debug || false;
         this.batchRequests = (_a = config.batch_requests) !== null && _a !== void 0 ? _a : true;
+        this.loadingPattern = ((_b = config.loading) === null || _b === void 0 ? void 0 : _b.pattern) || DEFAULT_LOADING_CONFIG.pattern;
         // Create appropriate cache based on configuration
         this.cache = this.createCache(config);
     }
@@ -687,6 +736,12 @@ class LiveI18n {
         return this.defaultLanguage;
     }
     /**
+     * Get the current loading pattern configuration
+     */
+    getLoadingPattern() {
+        return this.loadingPattern;
+    }
+    /**
      * Add a listener for default language changes
      * Returns an unsubscribe function
      */
@@ -868,7 +923,11 @@ const LiveText = ({ children, tone, context, language, fallback, onTranslationCo
         onError,
         instance
     ]);
-    return jsx(Fragment, { children: translated });
+    // Show loading indicator on initial load (attempts = 0) while loading
+    const shouldShowLoading = isLoading && attempts === 0;
+    const loadingPattern = instance.getLoadingPattern();
+    const displayText = shouldShowLoading ? generateLoadingText(textContent, loadingPattern) : translated;
+    return jsx(Fragment, { children: displayText });
 };
 /**
  * Hook for programmatic translation access
@@ -911,6 +970,7 @@ function getDefaultLanguage() {
 
 var LiveText$1 = /*#__PURE__*/Object.freeze({
     __proto__: null,
+    LiveI18nContext: LiveI18nContext,
     LiveI18nProvider: LiveI18nProvider,
     LiveText: LiveText,
     getDefaultLanguage: getDefaultLanguage,
@@ -941,13 +1001,22 @@ var LiveText$1 = /*#__PURE__*/Object.freeze({
  */
 function useLiveText(text, options) {
     const [translatedText, setTranslatedText] = useState(text);
+    const [isLoading, setIsLoading] = useState(false);
     const { translate, defaultLanguage } = useLiveI18n();
+    const context = useContext(LiveI18nContext);
     useEffect(() => {
+        var _a;
         // Don't translate empty strings
         if (!text.trim()) {
             setTranslatedText(text);
+            setIsLoading(false);
             return;
         }
+        // Get loading pattern from config
+        const loadingPattern = ((_a = context === null || context === void 0 ? void 0 : context.instance) === null || _a === void 0 ? void 0 : _a.getLoadingPattern()) || 'none';
+        // Show loading indicator
+        setIsLoading(true);
+        setTranslatedText(generateLoadingText(text, loadingPattern));
         // Perform translation
         translate(text, options)
             .then((result) => {
@@ -957,6 +1026,9 @@ function useLiveText(text, options) {
             console.error('useLiveText translation failed:', error);
             // Fallback to original text on error
             setTranslatedText(text);
+        })
+            .finally(() => {
+            setIsLoading(false);
         });
     }, [
         text,
@@ -964,7 +1036,8 @@ function useLiveText(text, options) {
         options === null || options === void 0 ? void 0 : options.tone,
         options === null || options === void 0 ? void 0 : options.language,
         defaultLanguage, // Re-translate when default language changes
-        translate
+        translate,
+        context
     ]);
     return translatedText;
 }
@@ -980,5 +1053,5 @@ async function translate(text, options) {
     return instance.translate(text, options);
 }
 
-export { LRUCache, LiveI18n, LiveI18nProvider, LiveText, LocalStorageCache, generateCacheKey, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n, useLiveText };
+export { LRUCache, LiveI18n, LiveI18nProvider, LiveText, LocalStorageCache, generateCacheKey, generateLoadingText, getDefaultLanguage, getLiveI18nInstance, initializeLiveI18n, translate, updateDefaultLanguage, useLiveI18n, useLiveText };
 //# sourceMappingURL=index.js.map

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useLiveI18n } from './LiveText';
+import React, { useState, useEffect, useContext } from 'react';
+import { useLiveI18n, LiveI18nContext } from './LiveText';
 import type { LiveTextOptions } from './types';
+import { generateLoadingText } from './loadingIndicator';
 
 /**
  * Hook for programmatic text translation that returns a string value
@@ -23,14 +24,24 @@ import type { LiveTextOptions } from './types';
  */
 export function useLiveText(text: string, options?: LiveTextOptions): string {
   const [translatedText, setTranslatedText] = useState(text);
+  const [isLoading, setIsLoading] = useState(false);
   const { translate, defaultLanguage } = useLiveI18n();
+  const context = useContext(LiveI18nContext);
 
   useEffect(() => {
     // Don't translate empty strings
     if (!text.trim()) {
       setTranslatedText(text);
+      setIsLoading(false);
       return;
     }
+
+    // Get loading pattern from config
+    const loadingPattern = context?.instance?.getLoadingPattern() || 'none';
+
+    // Show loading indicator
+    setIsLoading(true);
+    setTranslatedText(generateLoadingText(text, loadingPattern));
 
     // Perform translation
     translate(text, options)
@@ -41,6 +52,9 @@ export function useLiveText(text: string, options?: LiveTextOptions): string {
         console.error('useLiveText translation failed:', error);
         // Fallback to original text on error
         setTranslatedText(text);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }, [
     text,
@@ -48,7 +62,8 @@ export function useLiveText(text: string, options?: LiveTextOptions): string {
     options?.tone, 
     options?.language,
     defaultLanguage, // Re-translate when default language changes
-    translate
+    translate,
+    context
   ]);
 
   return translatedText;

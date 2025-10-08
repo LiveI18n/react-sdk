@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, createContext, useContext } from 'react';
 import { LiveI18n } from './LiveI18n';
 import type { LiveTextOptions, LiveI18nConfig } from './types';
+import { generateLoadingText } from './loadingIndicator';
 
 // No longer using global instance - all access through Context Provider
 
@@ -11,7 +12,7 @@ interface LiveI18nContextValue {
   updateDefaultLanguage: (language?: string) => void;
 }
 
-const LiveI18nContext = createContext<LiveI18nContextValue>({
+export const LiveI18nContext = createContext<LiveI18nContextValue>({
   instance: null,
   defaultLanguage: undefined,
   updateDefaultLanguage: () => {}
@@ -185,7 +186,12 @@ export const LiveText: React.FC<LiveTextProps> = ({
     instance
   ]);
 
-  return <>{translated}</>;
+  // Show loading indicator on initial load (attempts = 0) while loading
+  const shouldShowLoading = isLoading && attempts === 0;
+  const loadingPattern = instance.getLoadingPattern();
+  const displayText = shouldShowLoading ? generateLoadingText(textContent, loadingPattern) : translated;
+  
+  return <>{displayText}</>;
 };
 
 /**
