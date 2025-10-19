@@ -1,5 +1,5 @@
 import { jsx, Fragment } from 'react/jsx-runtime';
-import { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 
 const DEFAULT_CACHE_SIZE = 500;
 class LRUCache {
@@ -939,18 +939,33 @@ function useLiveI18n() {
         throw new Error('useLiveI18n must be used within LiveI18nProvider');
     }
     const instance = context.instance; // TypeScript now knows this is not null
-    const translate = async (text, options) => {
+    // Memoize the translate function to prevent recreation on every render
+    const translate = useCallback(async (text, options) => {
         return instance.translate(text, options);
-    };
-    return {
+    }, [instance]);
+    // Memoize instance-based functions
+    const clearCache = useCallback(() => instance.clearCache(), [instance]);
+    const getCacheStats = useCallback(() => instance.getCacheStats() || { size: 0, maxSize: 0 }, [instance]);
+    const getDefaultLanguage = useCallback(() => instance.getDefaultLanguage(), [instance]);
+    const getSupportedLanguages = useCallback((all) => instance.getSupportedLanguages(all), [instance]);
+    // Memoize the entire return object
+    return useMemo(() => ({
         translate,
         defaultLanguage: context.defaultLanguage,
-        clearCache: () => instance.clearCache(),
-        getCacheStats: () => instance.getCacheStats() || { size: 0, maxSize: 0 },
+        clearCache,
+        getCacheStats,
         updateDefaultLanguage: context.updateDefaultLanguage,
-        getDefaultLanguage: () => instance.getDefaultLanguage(),
-        getSupportedLanguages: (all) => instance.getSupportedLanguages(all)
-    };
+        getDefaultLanguage,
+        getSupportedLanguages
+    }), [
+        translate,
+        context.defaultLanguage,
+        clearCache,
+        getCacheStats,
+        context.updateDefaultLanguage,
+        getDefaultLanguage,
+        getSupportedLanguages
+    ]);
 }
 /**
  * Legacy function - use useLiveI18n hook instead

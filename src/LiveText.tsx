@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, createContext, useContext } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, createContext, useContext } from 'react';
 import { LiveI18n } from './LiveI18n';
 import type { LiveTextOptions, LiveI18nConfig } from './types';
 import { generateLoadingText } from './loadingIndicator';
@@ -207,19 +207,35 @@ export function useLiveI18n() {
 
   const instance = context.instance; // TypeScript now knows this is not null
 
-  const translate = async (text: string, options?: LiveTextOptions): Promise<string> => {
+  // Memoize the translate function to prevent recreation on every render
+  const translate = useCallback(async (text: string, options?: LiveTextOptions): Promise<string> => {
     return instance.translate(text, options);
-  };
+  }, [instance]);
 
-  return {
+  // Memoize instance-based functions
+  const clearCache = useCallback(() => instance.clearCache(), [instance]);
+  const getCacheStats = useCallback(() => instance.getCacheStats() || { size: 0, maxSize: 0 }, [instance]);
+  const getDefaultLanguage = useCallback(() => instance.getDefaultLanguage(), [instance]);
+  const getSupportedLanguages = useCallback((all?: boolean) => instance.getSupportedLanguages(all), [instance]);
+
+  // Memoize the entire return object
+  return useMemo(() => ({
     translate,
     defaultLanguage: context.defaultLanguage,
-    clearCache: () => instance.clearCache(),
-    getCacheStats: () => instance.getCacheStats() || { size: 0, maxSize: 0 },
+    clearCache,
+    getCacheStats,
     updateDefaultLanguage: context.updateDefaultLanguage,
-    getDefaultLanguage: () => instance.getDefaultLanguage(),
-    getSupportedLanguages: (all?: boolean) => instance.getSupportedLanguages(all)
-  };
+    getDefaultLanguage,
+    getSupportedLanguages
+  }), [
+    translate,
+    context.defaultLanguage,
+    clearCache,
+    getCacheStats,
+    context.updateDefaultLanguage,
+    getDefaultLanguage,
+    getSupportedLanguages
+  ]);
 }
 
 /**
