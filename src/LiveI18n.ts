@@ -30,6 +30,10 @@ export class LiveI18n {
   
   // Supported languages cache
   private supportedLanguagesCache: { [key: string]: { data: SupportedLanguagesResponse; timestamp: number } } = {};
+  
+  // Cached detected locale to avoid repeated detection
+  private cachedDetectedLocale: { locale: string; timestamp: number } | null = null;
+  private cacheTimeout: number; // Cache TTL in milliseconds
 
   constructor(config: LiveI18nConfig) {
     this.apiKey = config.apiKey;
@@ -42,6 +46,9 @@ export class LiveI18n {
     
     // Create appropriate cache based on configuration
     this.cache = this.createCache(config);
+    
+    // Set cache timeout based on the actual cache instance TTL
+    this.cacheTimeout = this.cache.getTtl();
   }
 
   private createCache(config: LiveI18nConfig): LRUCache<string, string> | LocalStorageCache {
@@ -311,9 +318,9 @@ export class LiveI18n {
       const queueItem = currentQueue[i];
       const result = results[i];
       
-      // Check if result is different from original text (successful translation)
-      if (result && result !== queueItem.text) {
-        // Cache the successful translation locally
+      // Cache the result if we got a valid response
+      if (result) {
+        // Cache the successful translation locally (even if it's the same as original)
         this.cache.set(queueItem.cacheKey, result);
         queueItem.resolve(result);
       } else {
@@ -485,6 +492,8 @@ export class LiveI18n {
    */
   updateDefaultLanguage(language?: string): void {
     this.defaultLanguage = language;
+    // Clear cached detected locale since language preference has changed
+    this.cachedDetectedLocale = null;
     // Notify all listeners of the language change
     this.languageChangeListeners.forEach(listener => listener(language));
   }
@@ -573,12 +582,29 @@ export class LiveI18n {
   }
 
   /**
-   * Detect browser locale
+   * Detect browser locale (cached for performance with TTL)
    */
   private detectLocale(): string {
-    if (typeof window !== 'undefined' && window.navigator) {
-      return window.navigator.language || 'en-US';
+    const now = Date.now();
+    
+    // Return cached locale if still valid
+    if (this.cachedDetectedLocale && (now - this.cachedDetectedLocale.timestamp) < this.cacheTimeout) {
+      this.debugLog(`Using cached detected locale: ${this.cachedDetectedLocale.locale}`);
+      return this.cachedDetectedLocale.locale;
     }
-    return 'en-US';
+    
+    // Detect and cache the locale
+    let detectedLocale = 'en-US';
+    if (typeof window !== 'undefined' && window.navigator) {
+      detectedLocale = window.navigator.language || 'en-US';
+    }
+    
+    this.cachedDetectedLocale = {
+      locale: detectedLocale,
+      timestamp: now
+    };
+    this.debugLog(`Detected and cached locale: ${detectedLocale} (TTL: ${this.cacheTimeout}ms)`);
+    
+    return detectedLocale;
   }
 }

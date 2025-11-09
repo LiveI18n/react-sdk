@@ -8,4 +8,8 @@ export declare class LRUCache<K, V> {
     set(key: K, value: V, onEvict?: (evictedKey: K) => void): void;
     clear(): void;
     size(): number;
+    /**
+     * Get the cache TTL in milliseconds
+     */
+    getTtl(): number;
 }

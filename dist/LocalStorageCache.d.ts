@@ -33,4 +33,8 @@ export declare class LocalStorageCache {
      * Clear expired items from localStorage to free up space
      */
     private clearExpiredItems;
+    /**
+     * Get the cache TTL in milliseconds
+     */
+    getTtl(): number;
 }

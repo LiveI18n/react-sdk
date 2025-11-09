@@ -45,6 +45,12 @@ class LRUCache {
     size() {
         return this.cache.size;
     }
+    /**
+     * Get the cache TTL in milliseconds
+     */
+    getTtl() {
+        return this.ttl;
+    }
 }
 
 /**
@@ -245,6 +251,12 @@ class LocalStorageCache {
             console.warn('LiveI18n: Error clearing expired cache items:', error);
         }
     }
+    /**
+     * Get the cache TTL in milliseconds
+     */
+    getTtl() {
+        return this.ttl;
+    }
 }
 
 /**
@@ -360,6 +372,8 @@ class LiveI18n {
         this.queueTimer = null;
         // Supported languages cache
         this.supportedLanguagesCache = {};
+        // Cached detected locale to avoid repeated detection
+        this.cachedDetectedLocale = null;
         this.apiKey = config.apiKey;
         this.customerId = config.customerId;
         this.endpoint = config.endpoint || 'https://api.livei18n.com';
@@ -369,6 +383,8 @@ class LiveI18n {
         this.loadingPattern = ((_b = config.loading) === null || _b === void 0 ? void 0 : _b.pattern) || DEFAULT_LOADING_CONFIG.pattern;
         // Create appropriate cache based on configuration
         this.cache = this.createCache(config);
+        // Set cache timeout based on the actual cache instance TTL
+        this.cacheTimeout = this.cache.getTtl();
     }
     createCache(config) {
         // Create cache based on configuration
@@ -575,9 +591,9 @@ class LiveI18n {
         for (let i = 0; i < currentQueue.length; i++) {
             const queueItem = currentQueue[i];
             const result = results[i];
-            // Check if result is different from original text (successful translation)
-            if (result && result !== queueItem.text) {
-                // Cache the successful translation locally
+            // Cache the result if we got a valid response
+            if (result) {
+                // Cache the successful translation locally (even if it's the same as original)
                 this.cache.set(queueItem.cacheKey, result);
                 queueItem.resolve(result);
             }
@@ -726,6 +742,8 @@ class LiveI18n {
      */
     updateDefaultLanguage(language) {
         this.defaultLanguage = language;
+        // Clear cached detected locale since language preference has changed
+        this.cachedDetectedLocale = null;
         // Notify all listeners of the language change
         this.languageChangeListeners.forEach(listener => listener(language));
     }
@@ -799,13 +817,26 @@ class LiveI18n {
         }
     }
     /**
-     * Detect browser locale
+     * Detect browser locale (cached for performance with TTL)
      */
     detectLocale() {
-        if (typeof window !== 'undefined' && window.navigator) {
-            return window.navigator.language || 'en-US';
+        const now = Date.now();
+        // Return cached locale if still valid
+        if (this.cachedDetectedLocale && (now - this.cachedDetectedLocale.timestamp) < this.cacheTimeout) {
+            this.debugLog(`Using cached detected locale: ${this.cachedDetectedLocale.locale}`);
+            return this.cachedDetectedLocale.locale;
         }
-        return 'en-US';
+        // Detect and cache the locale
+        let detectedLocale = 'en-US';
+        if (typeof window !== 'undefined' && window.navigator) {
+            detectedLocale = window.navigator.language || 'en-US';
+        }
+        this.cachedDetectedLocale = {
+            locale: detectedLocale,
+            timestamp: now
+        };
+        this.debugLog(`Detected and cached locale: ${detectedLocale} (TTL: ${this.cacheTimeout}ms)`);
+        return detectedLocale;
     }
 }
 

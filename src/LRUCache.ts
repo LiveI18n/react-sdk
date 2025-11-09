@@ -58,4 +58,11 @@ export class LRUCache<K, V> {
   size(): number {
     return this.cache.size;
   }
+
+  /**
+   * Get the cache TTL in milliseconds
+   */
+  getTtl(): number {
+    return this.ttl;
+  }
 }

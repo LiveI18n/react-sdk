@@ -218,4 +218,11 @@ export class LocalStorageCache {
       console.warn('LiveI18n: Error clearing expired cache items:', error);
     }
   }
+
+  /**
+   * Get the cache TTL in milliseconds
+   */
+  getTtl(): number {
+    return this.ttl;
+  }
 }
